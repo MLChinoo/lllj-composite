@@ -23,7 +23,7 @@ namespace atri_composite
             var imagePrefix = Path.GetFullPath(descPath);
             imagePrefix = imagePrefix.Substring(0, imagePrefix.Length - 4) + "_";
 
-            var jArr = Utils.LoadPBDFile(descPath, true);
+            var jArr = Utils.LoadPBDFile(descPath, false);
 
             int i = 0;
             Width = (int)jArr[i]["width"];

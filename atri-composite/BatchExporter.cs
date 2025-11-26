@@ -34,8 +34,8 @@ namespace atri_composite
         {
             var errors = EnumerateVariants(limit).AsParallel().WithDegreeOfParallelism(Environment.ProcessorCount * 4).Select(_ =>
             {
-                var (character, pose, dress, size, preset, addition) = _;
-                var pbdPath = Path.Combine(WorkingDirectory, character.Name, $"{pose.Name}_{size}.pbd");
+                var (character, pose, dress, face, addition) = _;
+                var pbdPath = Path.Combine(WorkingDirectory, character.Name, $"{pose.Name}.pbd");
 
                 // also allow images to be placed in the data root
                 if (!File.Exists(pbdPath))
@@ -46,8 +46,9 @@ namespace atri_composite
                 var image = new CompoundImage(pbdPath);
                 var layers = new List<string>();
                 layers.Add(dress.LayerPath);
-                layers.Add(addition.LayerPath);
-                layers.AddRange(preset.Items.Reverse().Select(o => o.Value.LayerPath));
+                layers.Add(addition.LayerPaths[0]);
+                layers.Add(face.LayerPath);
+                layers.AddRange(addition.LayerPaths.GetRange(1, addition.LayerPaths.Count - 1));
 
                 BitmapSource result;
                 try
@@ -56,12 +57,12 @@ namespace atri_composite
                 }
                 catch (Exception e)
                 {
-                    return $"{character}_{pose}_{dress}_{size}_{preset}_{addition}: {e.Message}";
+                    return $"{character}_{pose}_{dress}_{face}_{addition}: {e.Message}";
                 }
 
                 var encoder = new PngBitmapEncoder();
                 encoder.Frames.Add(BitmapFrame.Create(result));
-                using (var file = File.Create(Path.Combine(TargetDirectory, $"{character}_{pose}_{size}_{dress}_{addition}_{preset}.png")))
+                using (var file = File.Create(Path.Combine(TargetDirectory, $"{character}_{pose}_{dress}_{face}_{addition}.png")))
                     encoder.Save(file);
                 return null;
             }).Where(o => o != null).ToList();
@@ -75,19 +76,17 @@ namespace atri_composite
             return errors.Count;
         }
 
-        public IEnumerable<(Character, Character.Pose, Character.Pose.Dress, string, Character.Pose.Preset, Character.Pose.Dress.Addition)> EnumerateVariants(Limitation limit) =>
+        public IEnumerable<(Character, Character.Pose, Character.Pose.Dress, Character.Pose.Face, Character.Pose.Dress.Addition)> EnumerateVariants(Limitation limit) =>
             (limit.Character != null ? new List<Character>() { limit.Character } : Characters).SelectMany(character =>
             (limit.Pose != null ? new List<Character.Pose>() { limit.Pose } : character.Poses).SelectMany(pose =>
             {
                 var dresses = limit.Dress != null || limit.Addition != null ? new List<Character.Pose.Dress>() { limit.Dress } : pose.Dresses;
-                var sizes = limit.Size != null ? new List<string>() { limit.Size } : pose.Sizes;
-                var presets = pose.Presets;
+                var faces = pose.Faces;
                 return dresses.SelectMany(dress =>
-                    sizes.SelectMany(size =>
-                    presets.SelectMany(preset =>
+                    faces.SelectMany(preset =>
                     (limit.Addition != null ? new List<Character.Pose.Dress.Addition>() { limit.Addition } : dress.Additions).Select(addition =>
-                        (character, pose, dress, size, preset, addition)
-                    ))));
+                        (character, pose, dress, preset, addition)
+                    )));
             }));
     }
 }

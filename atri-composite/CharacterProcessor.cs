@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -15,14 +16,13 @@ namespace atri_composite
             foreach (var file in standFiles)
             {
                 var character = new Character() { Name = Path.GetFileNameWithoutExtension(file) };
-                var rtxt = Regex.Matches(File.ReadAllText(file, Encoding.Unicode), "\"filename\"=>\"[a-zA-Z0-9]+\"");
+                var rtxt = Regex.Matches(File.ReadAllText(file, Encoding.Unicode), "filename:'([^']+)'");
                 foreach (Match match in rtxt)
                 {
-                    var m = match.Value;
-                    var name = m.Substring(13, m.Length - 14);
+                    var m = match.Groups[1].Value;
+                    var name = m;
 
                     var pose = ProcessStandInfo(Path.Combine(fgimageDir, name + ".sinfo"));
-                    pose.Sizes.AddRange(GetSizes(Path.Combine(fgimageDir, Path.GetFileNameWithoutExtension(file)), name));
                     pose.Name = name;
                     character.Poses.Add(pose);
                 }
@@ -47,68 +47,22 @@ namespace atri_composite
                         var dressName = blocks[paramIndex++];
                         if (!pose.Dresses.Exists(o => o.Name == dressName)) pose.Dresses.Add(new Character.Pose.Dress() { Name = dressName });
                         var dress = pose.Dresses.First(o => o.Name == dressName);
-                        switch (blocks[paramIndex++])
-                        {
-                            case "base":
-                                dress.LayerPath = blocks[paramIndex++];
-                                break;
-                            case "diff":
-                                dress.Additions.Add(new Character.Pose.Dress.Addition() { Name = blocks[paramIndex++], LayerPath = blocks[paramIndex++] });
-                                break;
-                        }
+                        Debug.Assert(blocks[paramIndex++] == "diff");
+                        string additionName = blocks[paramIndex++];
+                        string dressLayerPath = blocks[paramIndex++];
+                        if (!dress.Additions.Exists(o => o.Name == additionName)) dress.Additions.Add(new Character.Pose.Dress.Addition() { Name = additionName });
+                        var addition = dress.Additions.First(o => o.Name == additionName);
+                        addition.LayerPaths.Add(dressLayerPath);
                         break;
-                    case "facegroup":
-                        pose.FaceComponents.Add(new Character.Pose.FaceComponent() { Name = blocks[paramIndex++] });
-                        break;
-                    case "fgname":
-                        var fgname = blocks[paramIndex++];
-                        pose.FaceComponents.First(y => fgname.StartsWith(y.Name)).Variants.Add(new Character.Pose.FaceComponent.Variant() { Name = fgname, LayerPath = blocks[paramIndex++] });
-                        break;
-                    case "fgalias":
-                        var fgalias = blocks[paramIndex++];
-                        var items = new List<KeyValuePair<string, Character.Pose.FaceComponent.Variant>>();
-                        do
-                        {
-                            var k = blocks[paramIndex++]; var v = pose.FaceComponents.FirstOrDefault(p => k.StartsWith(p.Name))?.Variants.FirstOrDefault(p => p.Name == k);
-
-                            // seems that ginka contains some invalid facegroup refs
-                            if (v != null)
-                            {
-                                items.Add(new KeyValuePair<string, Character.Pose.FaceComponent.Variant>(k, v));
-                            }
-                            else
-                            {
-                                System.Diagnostics.Trace.TraceWarning($"unknown facegroup: {k}");
-                            }
-                        }
-                        while (paramIndex < blocks.Count);
-                        pose.Presets.Add(new Character.Pose.Preset() { Name = fgalias, Items = items.ToArray() });
+                    case "face":
+                        string faceName = blocks[paramIndex++];
+                        string faceType = blocks[paramIndex++];
+                        string faceLayerPath = blocks[paramIndex++];
+                        pose.Faces.Add(new Character.Pose.Face() { Name = faceName, LayerPath = faceLayerPath});
                         break;
                 }
             });
             return pose;
-        }
-
-        private static List<string> GetSizes(string dir, string name)
-        {
-            var result = new List<string>();
-            if (Directory.Exists(dir))
-            {
-                result.AddRange(Directory.GetFiles(dir)
-                    .Select(o => Path.GetFileName(o))
-                    .Where(o => Regex.IsMatch(o, $@"{name}_[a-zA-Z0-9]+.pbd$"))
-                    .Select(o => o.Substring(name.Length + 1, o.Length - name.Length - 5))
-                );
-            }
-
-            // also allow images to be placed in the data root
-            result.AddRange(Directory.GetFiles(Directory.GetParent(dir).FullName)
-                .Select(o => Path.GetFileName(o))
-                .Where(o => Regex.IsMatch(o, $@"{name}_[a-zA-Z0-9]+.pbd$"))
-                .Select(o => o.Substring(name.Length + 1, o.Length - name.Length - 5))
-            );
-
-            return result;
         }
     }
 }

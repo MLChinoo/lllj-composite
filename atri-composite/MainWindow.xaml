@@ -11,11 +11,6 @@
     </Window.Resources>
     <Grid>
         <Image x:Name="img" Margin="200,10,10,10" RenderOptions.BitmapScalingMode="Fant" Source="{Binding Image, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"/>
-        <GroupBox HorizontalAlignment="Left" Margin="10,196,0,45.4" Width="180" Header="Face Components">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="extraConfigPanel" Margin="5"/>
-            </ScrollViewer>
-        </GroupBox>
         <DockPanel HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="180">
             <Label Content="Character: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
             <ComboBox VerticalAlignment="Center" ItemsSource="{Binding Characters, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedCharacter, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnSelectionChanged"/>
@@ -26,11 +21,7 @@
         </DockPanel>
         <DockPanel HorizontalAlignment="Left" Margin="10,165,0,0" VerticalAlignment="Top" Width="180">
             <Label Content="Face: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
-            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding SelectedPose.Presets, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnFaceSelectionChanged"/>
-        </DockPanel>
-        <DockPanel HorizontalAlignment="Left" Margin="10,72,0,0" VerticalAlignment="Top" Width="180">
-            <Label Content="Size: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
-            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding SelectedPose.Sizes, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedSize, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnSelectionChanged"/>
+            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding SelectedPose.Faces, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedFace, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnFaceSelectionChanged"/>
         </DockPanel>
         <DockPanel HorizontalAlignment="Left" Margin="10,103,0,0" VerticalAlignment="Top" Width="180">
             <Label Content="Dress: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
@@ -60,31 +51,20 @@
                             </MultiBinding>
                         </MenuItem.Header>
                     </MenuItem>
-                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size" IsEnabled="{Binding SelectedSize, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
+                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size,Dress" IsEnabled="{Binding SelectedDress, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
                         <MenuItem.Header>
                             <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2})"  Converter="{StaticResource ToStringConverter}">
                                 <Binding Path="SelectedCharacter" TargetNullValue="Character"/>
                                 <Binding Path="SelectedPose" TargetNullValue="Pose"/>
-                                <Binding Path="SelectedSize" TargetNullValue="Size"/>
-                            </MultiBinding>
-                        </MenuItem.Header>
-                    </MenuItem>
-                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size,Dress" IsEnabled="{Binding SelectedDress, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
-                        <MenuItem.Header>
-                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2} - {3})"  Converter="{StaticResource ToStringConverter}">
-                                <Binding Path="SelectedCharacter" TargetNullValue="Character"/>
-                                <Binding Path="SelectedPose" TargetNullValue="Pose"/>
-                                <Binding Path="SelectedSize" TargetNullValue="Size"/>
                                 <Binding Path="SelectedDress" TargetNullValue="Dress"/>
                             </MultiBinding>
                         </MenuItem.Header>
                     </MenuItem>
                     <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size,Dress,Addition" IsEnabled="{Binding SelectedAddition, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
                         <MenuItem.Header>
-                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2} - {3} - {4})"  Converter="{StaticResource ToStringConverter}">
+                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2} - {3})"  Converter="{StaticResource ToStringConverter}">
                                 <Binding Path="SelectedCharacter" TargetNullValue="Character"/>
                                 <Binding Path="SelectedPose" TargetNullValue="Pose"/>
-                                <Binding Path="SelectedSize" TargetNullValue="Size"/>
                                 <Binding Path="SelectedDress" TargetNullValue="Dress"/>
                                 <Binding Path="SelectedAddition" TargetNullValue="Addition"/>
                             </MultiBinding>

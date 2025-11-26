@@ -13,34 +13,12 @@ namespace atri_composite
         public class Pose
         {
             public string Name { get; set; }
-
-            public List<FaceComponent> FaceComponents { get; } = new List<FaceComponent>();
-
+            
             public List<Dress> Dresses { get; } = new List<Dress>();
 
-            public List<Preset> Presets { get; } = new List<Preset>();
-
-            public List<string> Sizes { get; } = new List<string>();
-
+            public List<Face> Faces { get; } = new List<Face>();
+            
             public override string ToString() => Name;
-
-            public class FaceComponent
-            {
-                public string Name { get; set; }
-
-                public List<Variant> Variants { get; } = new List<Variant>();
-
-                public override string ToString() => Name;
-
-                public class Variant
-                {
-                    public string Name { get; set; }
-
-                    public string LayerPath { get; set; }
-
-                    public override string ToString() => Name;
-                }
-            }
 
             public class Dress
             {
@@ -55,18 +33,18 @@ namespace atri_composite
                 public class Addition
                 {
                     public string Name { get; set; }
-
-                    public string LayerPath { get; set; }
+                    
+                    public List<string> LayerPaths { get; } = new List<string>();
 
                     public override string ToString() => Name;
                 }
             }
 
-            public class Preset
+            public class Face
             {
                 public string Name { get; set; }
-
-                public KeyValuePair<string, FaceComponent.Variant>[] Items { get; set; }
+                
+                public string LayerPath { get; set; }
 
                 public override string ToString() => Name;
             }

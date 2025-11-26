@@ -51,11 +51,8 @@ namespace atri_composite
         private Character.Pose.Dress.Addition _selectedAddition;
         public Character.Pose.Dress.Addition SelectedAddition { get => _selectedAddition; set => OnPropertyChanged(_selectedAddition = value); }
 
-        private string _selectedSize;
-        public string SelectedSize { get => _selectedSize; set => OnPropertyChanged(_selectedSize = value); }
-
-        private Character.Pose.FaceComponent.Variant[] _selectedFaceComponents;
-        public Character.Pose.FaceComponent.Variant[] SelectedFaceComponents { get => _selectedFaceComponents; set => OnPropertyChanged(_selectedFaceComponents = value); }
+        private Character.Pose.Face _selectedFace;
+        public Character.Pose.Face SelectedFace { get => _selectedFace; set => OnPropertyChanged(_selectedFace = value); }
 
         private string WorkingDirectory { get; }
 
@@ -78,45 +75,11 @@ namespace atri_composite
             InitializeComponent();
         }
 
-        private void ReloadFaceComponents()
-        {
-            extraConfigPanel.Children.Clear();
-            SelectedFaceComponents = null;
-
-            if (SelectedPose == null) return;
-            SelectedFaceComponents = new Character.Pose.FaceComponent.Variant[SelectedPose.FaceComponents.Count];
-
-            for (int i = 0; i < SelectedPose.FaceComponents.Count; i++)
-            {
-                var component = SelectedPose.FaceComponents[i];
-                var panel = new DockPanel();
-
-                panel.Children.Add(new Label() { Content = component.Name, Width = 70 });
-
-                ComboBox comboBox = new ComboBox()
-                {
-                    ItemsSource = component.Variants,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                comboBox.SetBinding(Selector.SelectedItemProperty, new Binding()
-                {
-                    Path = new PropertyPath($"SelectedFaceComponents[{i}]"),
-                    Source = this,
-                    Mode = BindingMode.TwoWay
-                });
-                comboBox.SelectionChanged += OnSelectionChanged;
-                comboBox.SelectedIndex = 0;
-                panel.Children.Add(comboBox);
-
-                extraConfigPanel.Children.Add(panel);
-            }
-        }
-
         private void TryBuildImage()
         {
-            if (SelectedCharacter != null && SelectedPose != null && SelectedDress != null && SelectedAddition != null && SelectedSize != null && SelectedFaceComponents != null && !PauseGenerate)
+            if (SelectedCharacter != null && SelectedPose != null && SelectedDress != null && SelectedAddition != null && !PauseGenerate)
             {
-                var pbdPath = Path.Combine(WorkingDirectory, SelectedCharacter.Name, $"{SelectedPose.Name}_{SelectedSize}.pbd");
+                var pbdPath = Path.Combine(WorkingDirectory, SelectedCharacter.Name, $"{SelectedPose.Name}.pbd");
 
                 // also allow images to be placed in the data root
                 if (!File.Exists(pbdPath))
@@ -127,8 +90,9 @@ namespace atri_composite
                 var image = new CompoundImage(pbdPath);
                 var layers = new List<string>();
                 layers.Add(SelectedDress.LayerPath);
-                layers.Add(SelectedAddition.LayerPath);
-                layers.AddRange(SelectedFaceComponents.Reverse().Select(o => o.LayerPath));
+                layers.Add(SelectedAddition.LayerPaths[0]);
+                layers.Add(SelectedFace.LayerPath);
+                layers.AddRange(SelectedAddition.LayerPaths.GetRange(1, SelectedAddition.LayerPaths.Count - 1));
 
                 try
                 {
@@ -144,30 +108,11 @@ namespace atri_composite
             else Image = null;
         }
 
-        private void OnPoseSelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            ReloadFaceComponents();
-            TryBuildImage();
-        }
+        private void OnPoseSelectionChanged(object sender, SelectionChangedEventArgs e) => TryBuildImage();
 
         private void OnSelectionChanged(object sender, SelectionChangedEventArgs e) => TryBuildImage();
 
-        private void OnFaceSelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var key = (sender as ComboBox).SelectedItem;
-            if (key == null) return;
-
-            PauseGenerate = true;
-            foreach (var o in SelectedPose.Presets.First(o => o.Name == key.ToString()).Items)
-            {
-                var fGroup = SelectedPose.FaceComponents.First(p => o.Key.StartsWith(p.Name));
-                SelectedFaceComponents[SelectedPose.FaceComponents.IndexOf(fGroup)] = o.Value;
-            }
-            SelectedFaceComponents = SelectedFaceComponents;
-            PauseGenerate = false;
-
-            TryBuildImage();
-        }
+        private void OnFaceSelectionChanged(object sender, SelectionChangedEventArgs e) => TryBuildImage();
 
         private void OnExportClick(object sender, RoutedEventArgs e)
         {
@@ -216,7 +161,6 @@ namespace atri_composite
                     {
                         case "Character": limits.Character = SelectedCharacter; break;
                         case "Pose": limits.Pose = SelectedPose; break;
-                        case "Size": limits.Size = SelectedSize; break;
                         case "Dress": limits.Dress = SelectedDress; break;
                         case "Addition": limits.Addition = SelectedAddition; break;
                     }
