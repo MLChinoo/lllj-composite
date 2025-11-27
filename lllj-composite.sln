@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33103.184
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "atri-composite", "atri-composite\atri-composite.csproj", "{1B64071D-CEAA-439B-975C-C27364699998}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "lllj-composite", "lllj-composite\lllj-composite.csproj", "{1B64071D-CEAA-439B-975C-C27364699998}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TlgLib", "FreeMote.Tlg\TlgLib\TlgLib.vcxproj", "{DF6C7BC2-3D99-4AE8-86E5-087BA766A3A8}"
 EndProject

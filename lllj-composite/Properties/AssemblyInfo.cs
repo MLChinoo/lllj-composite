@@ -7,13 +7,13 @@ using System.Windows;
 // 有关程序集的一般信息由以下
 // 控制。更改这些特性值可修改
 // 与程序集关联的信息。
-[assembly: AssemblyTitle("atri-composite")]
+[assembly: AssemblyTitle("lllj-composite")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("atri-composite")]
+[assembly: AssemblyProduct("lllj-composite")]
 [assembly: AssemblyCopyright("Copyright © lictex_")]
-[assembly: AssemblyTrademark("")]
+[assembly: AssemblyTrademark("Forked by MLChinoo")]
 [assembly: AssemblyCulture("")]
 
 // 将 ComVisible 设置为 false 会使此程序集中的类型

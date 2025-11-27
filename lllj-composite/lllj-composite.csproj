@@ -7,7 +7,7 @@
     <ProjectGuid>{1B64071D-CEAA-439B-975C-C27364699998}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <RootNamespace>atri_composite</RootNamespace>
-    <AssemblyName>atri-composite</AssemblyName>
+    <AssemblyName>lllj-composite</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
