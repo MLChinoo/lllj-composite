@@ -44,7 +44,7 @@ namespace atri_composite
             {
                 public string Name { get; set; }
                 
-                public string LayerPath { get; set; }
+                public List<string> LayerPaths { get; } = new List<string>();
 
                 public override string ToString() => Name;
             }

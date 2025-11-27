@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 
@@ -72,7 +73,6 @@ namespace atri_composite
                 if (s == "dummy") continue;
                 var layer = GetLayer(s);
                 if (layer == null) throw new ArgumentException();
-                if (layer.Type != KrBlendMode.ltPsNormal) throw new NotSupportedException();
 
                 Bitmap layerBitmap;
                 FreeMote.Tlg.TlgLoader tlgLoader = null;
@@ -85,14 +85,115 @@ namespace atri_composite
                     tlgLoader = new FreeMote.Tlg.TlgLoader(File.ReadAllBytes(layer.Path));
                     layerBitmap = tlgLoader.Bitmap;
                 }
-                using (var g = Graphics.FromImage(bitmap))
-                    g.DrawImage(layerBitmap, layer.Left, layer.Top, layer.Width, layer.Height);
+                if (layer.Type == KrBlendMode.ltPsNormal)
+                {
+                    using (var g = Graphics.FromImage(bitmap))
+                    {
+                        var ia = new ImageAttributes();
+
+                        float op = layer.Opacity / 255f;
+                        ColorMatrix cm = new ColorMatrix { Matrix33 = op };
+
+                        ia.SetColorMatrix(cm);
+
+                        g.DrawImage(layerBitmap,
+                            new Rectangle(layer.Left, layer.Top, layer.Width, layer.Height),
+                            0, 0, layer.Width, layer.Height,
+                            GraphicsUnit.Pixel,
+                            ia);
+                    }
+                        
+                }
+                else if (layer.Type == KrBlendMode.ltPsDarken)
+                {
+                    BlendDarken(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity);
+                }
+                else
+                {
+                    throw new NotSupportedException($"Blend mode {layer.Type} is not supported.");
+                }
                 layerBitmap.Dispose();
                 tlgLoader?.Dispose();
             }
             return bitmap;
         }
+        
+        private static void BlendDarken(Bitmap baseBmp, Bitmap topBmp, int offsetX, int offsetY, int opacity)
+        {
+            var rectBase = new Rectangle(0, 0, baseBmp.Width, baseBmp.Height);
+            var rectTop = new Rectangle(0, 0, topBmp.Width, topBmp.Height);
 
+            var baseData = baseBmp.LockBits(rectBase, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+            var topData = topBmp.LockBits(rectTop, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+
+            try
+            {
+                int baseStride = baseData.Stride;
+                int topStride = topData.Stride;
+                
+                int startX = Math.Max(0, offsetX);
+                int startY = Math.Max(0, offsetY);
+                int endX = Math.Min(baseBmp.Width,  offsetX + topBmp.Width);
+                int endY = Math.Min(baseBmp.Height, offsetY + topBmp.Height);
+
+                if (startX >= endX || startY >= endY) return;
+                
+                unsafe
+                {
+                    byte* baseScan0 = (byte*)baseData.Scan0;
+                    byte* topScan0 = (byte*)topData.Scan0;
+
+                    for (int yBase = startY; yBase < endY; yBase++)
+                    {
+                        int yTop = yBase - offsetY;
+
+                        byte* baseRow = baseScan0 + yBase * baseStride;
+                        byte* topRow = topScan0 + yTop * topStride;
+
+                        for (int xBase = startX; xBase < endX; xBase++)
+                        {
+                            int xTop = xBase - offsetX;
+                            
+                            byte* basePixel = baseRow + xBase * 4;
+                            byte* topPixel = topRow + xTop * 4;
+
+                            byte tb = topPixel[0];
+                            byte tg = topPixel[1];
+                            byte tr = topPixel[2];
+                            byte ta = topPixel[3];
+
+                            if (ta == 0) continue;
+
+                            byte bb = basePixel[0];
+                            byte bg = basePixel[1];
+                            byte br = basePixel[2];
+                            byte ba = basePixel[3];
+
+                            byte db = bb < tb ? bb : tb;
+                            byte dg = bg < tg ? bg : tg;
+                            byte dr = br < tr ? br : tr;
+                            
+                            int a = (ta * opacity + 127) / 255;
+                            int invA = 255 - a;
+
+                            basePixel[0] = (byte)((bb * invA + db * a + 127) / 255);
+                            basePixel[1] = (byte)((bg * invA + dg * a + 127) / 255);
+                            basePixel[2] = (byte)((br * invA + dr * a + 127) / 255);
+                            
+                            int outA = ba + ((255 - ba) * a + 127) / 255;
+                            if (outA > 255) outA = 255;
+                            basePixel[3] = (byte)outA;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                baseBmp.UnlockBits(baseData);
+                topBmp.UnlockBits(topData);
+            }
+        }
+        
         public enum KrBlendMode
         {
             ltBinder = 0,
@@ -140,9 +241,14 @@ namespace atri_composite
         public class Layer
         {
             public string Path { get; set; }
-
+            
+            private string _name;
             [JsonProperty("name")]
-            public string Name { get; set; }
+            public string Name
+            {
+                get => _name;
+                set => _name = value?.Replace("/", "_");  // 22　驚き/目を見開く1 -> 22　驚き_目を見開く1
+            }
 
             [JsonProperty("type")]
             public KrBlendMode Type { get; set; }

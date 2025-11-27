@@ -46,7 +46,26 @@ namespace atri_composite
         public Character.Pose SelectedPose { get => _selectedPose; set => OnPropertyChanged(_selectedPose = value); }
 
         private Character.Pose.Dress _selectedDress;
-        public Character.Pose.Dress SelectedDress { get => _selectedDress; set => OnPropertyChanged(_selectedDress = value); }
+        public Character.Pose.Dress SelectedDress
+        {
+            get => _selectedDress;
+            set
+            {
+                string oldAdditionName = SelectedAddition?.Name;
+
+                OnPropertyChanged(_selectedDress = value);
+                
+                if (value?.Additions != null)
+                {
+                    SelectedAddition =
+                        value.Additions.FirstOrDefault(a => a.Name == oldAdditionName)
+                        ?? value.Additions.FirstOrDefault();
+                }
+
+                OnPropertyChanged(nameof(SelectedAddition));
+                TryBuildImage();
+            }
+        }
 
         private Character.Pose.Dress.Addition _selectedAddition;
         public Character.Pose.Dress.Addition SelectedAddition { get => _selectedAddition; set => OnPropertyChanged(_selectedAddition = value); }
@@ -77,7 +96,7 @@ namespace atri_composite
 
         private void TryBuildImage()
         {
-            if (SelectedCharacter != null && SelectedPose != null && SelectedDress != null && SelectedAddition != null && !PauseGenerate)
+            if (SelectedCharacter != null && SelectedPose != null && SelectedDress != null && SelectedAddition != null && SelectedFace != null && !PauseGenerate)
             {
                 var pbdPath = Path.Combine(WorkingDirectory, SelectedCharacter.Name, $"{SelectedPose.Name}.pbd");
 
@@ -91,7 +110,7 @@ namespace atri_composite
                 var layers = new List<string>();
                 layers.Add(SelectedDress.LayerPath);
                 layers.Add(SelectedAddition.LayerPaths[0]);
-                layers.Add(SelectedFace.LayerPath);
+                layers.AddRange(SelectedFace.LayerPaths);
                 layers.AddRange(SelectedAddition.LayerPaths.GetRange(1, SelectedAddition.LayerPaths.Count - 1));
 
                 try

@@ -47,7 +47,7 @@ namespace atri_composite
                 var layers = new List<string>();
                 layers.Add(dress.LayerPath);
                 layers.Add(addition.LayerPaths[0]);
-                layers.Add(face.LayerPath);
+                layers.AddRange(face.LayerPaths);
                 layers.AddRange(addition.LayerPaths.GetRange(1, addition.LayerPaths.Count - 1));
 
                 BitmapSource result;

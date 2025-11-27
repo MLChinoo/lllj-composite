@@ -58,7 +58,9 @@ namespace atri_composite
                         string faceName = blocks[paramIndex++];
                         string faceType = blocks[paramIndex++];
                         string faceLayerPath = blocks[paramIndex++];
-                        pose.Faces.Add(new Character.Pose.Face() { Name = faceName, LayerPath = faceLayerPath});
+                        if (!pose.Faces.Exists(o => o.Name == faceName)) pose.Faces.Add(new Character.Pose.Face() {Name = faceName});
+                        var face = pose.Faces.First(o => o.Name == faceName);
+                        face.LayerPaths.Add(faceLayerPath);
                         break;
                 }
             });
