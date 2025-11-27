@@ -12,7 +12,6 @@ namespace atri_composite
         {
             public Character Character;
             public Character.Pose Pose;
-            public string Size;
             public Character.Pose.Dress Dress;
             public Character.Pose.Dress.Addition Addition;
         }

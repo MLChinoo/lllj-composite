@@ -88,11 +88,12 @@ namespace atri_composite
               {
                   var proc = Process.Start(new ProcessStartInfo()
                   {
-                      FileName = "pbd2json.exe",
-                      Arguments = $"\"{pbdPath}\"",
+                      FileName = "cmd.exe",
+                      Arguments = $"/C chcp 65001 > nul && pbd2json.exe \"{pbdPath}\"",
                       UseShellExecute = false,
                       RedirectStandardOutput = true,
-                      CreateNoWindow = true
+                      CreateNoWindow = true,
+                      StandardOutputEncoding = Encoding.UTF8
                   });
                   var json = proc.StandardOutput.ReadToEnd();
                   proc.WaitForExit();
