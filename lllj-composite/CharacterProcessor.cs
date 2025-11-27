@@ -47,7 +47,7 @@ namespace atri_composite
                         var dressName = blocks[paramIndex++];
                         if (!pose.Dresses.Exists(o => o.Name == dressName)) pose.Dresses.Add(new Character.Pose.Dress() { Name = dressName });
                         var dress = pose.Dresses.First(o => o.Name == dressName);
-                        Debug.Assert(blocks[paramIndex++] == "diff");
+                        string additionType = blocks[paramIndex++];
                         string additionName = blocks[paramIndex++];
                         string dressLayerPath = blocks[paramIndex++];
                         if (!dress.Additions.Exists(o => o.Name == additionName)) dress.Additions.Add(new Character.Pose.Dress.Addition() { Name = additionName });
