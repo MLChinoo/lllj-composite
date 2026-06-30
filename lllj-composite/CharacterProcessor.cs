@@ -22,7 +22,15 @@ namespace atri_composite
                     var m = match.Groups[1].Value;
                     var name = m;
 
-                    var pose = ProcessStandInfo(Path.Combine(fgimageDir, name + ".sinfo"));
+                    var pose = new Character.Pose();
+                    try
+                    {
+                        pose = ProcessStandInfo(Path.Combine(fgimageDir, name + ".sinfo"));
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        pose = ProcessStandInfo(Path.Combine(fgimageDir, name + "_info.txt"));
+                    }
                     pose.Name = name;
                     character.Poses.Add(pose);
                 }
