@@ -96,8 +96,8 @@ namespace atri_composite
                 var layer = GetLayer(s);
                 if (layer == null) throw new ArgumentException();
                 
-                //if (layer.Visible == 0)
-                //    continue;
+                // 天音a 水着帽子 这个图层混合错误，暂时没定位到原因
+                if (layer.LayerID == 8320 && layer.Name.Equals("帽子埋め")) continue;
 
                 Bitmap layerBitmap;
                 FreeMote.Tlg.TlgLoader tlgLoader = null;

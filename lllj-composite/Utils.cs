@@ -132,7 +132,10 @@ namespace atri_composite
                     Trace.TraceError($"Failed to get subdirectories for {root}: {ex.Message}");
                 }
             }
-            allDirs = allDirs.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            allDirs = allDirs.Select(Path.GetFullPath)
+                // riddle_steam_dumps/fgimage/_nude文件夹下的png会干扰读取同名tlg
+                .Where(dir => !dir.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Contains("_nude", StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
             int totalDirs = allDirs.Count;
             int processedDirs = 0;
