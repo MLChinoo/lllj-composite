@@ -1,4 +1,4 @@
 [submodule "FreeMote.Tlg"]
 	path = FreeMote.Tlg
-	url = https://github.com/lictex/FreeMote.Tlg
-	branch = mod
+	url = https://github.com/UlyssesWu/FreeMote.Tlg
+	branch = master
