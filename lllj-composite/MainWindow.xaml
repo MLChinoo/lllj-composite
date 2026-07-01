@@ -6,74 +6,125 @@
         xmlns:local="clr-namespace:atri_composite"
         mc:Ignorable="d" Height="480" Width="640" MinWidth="640" MinHeight="480">
     <Window.Resources>
-        <local:ObjectNotNullConverter x:Key="SelectionAvailabilityConverter"/>
-        <local:ToStringConverter x:Key="ToStringConverter"/>
+        <local:ObjectNotNullConverter x:Key="SelectionAvailabilityConverter" />
+        <local:ToStringConverter x:Key="ToStringConverter" />
+        <local:FaceFilterConverter x:Key="FaceFilterConverter"/>
     </Window.Resources>
     <Grid>
-        <Image x:Name="img" Margin="200,10,10,10" RenderOptions.BitmapScalingMode="Fant" Source="{Binding Image, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"/>
+        <Image x:Name="img" Margin="200,10,10,10" RenderOptions.BitmapScalingMode="Fant"
+               Source="{Binding Image, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" />
         <DockPanel HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="180">
-            <Label Content="Character: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
-            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding Characters, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedCharacter, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnSelectionChanged"/>
+            <Label Content="Character: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80"
+                   HorizontalContentAlignment="Right" />
+            <ComboBox VerticalAlignment="Center"
+                      ItemsSource="{Binding Characters, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectedItem="{Binding SelectedCharacter, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectionChanged="OnSelectionChanged" />
         </DockPanel>
         <DockPanel HorizontalAlignment="Left" Margin="10,41,0,0" VerticalAlignment="Top" Width="180">
-            <Label Content="Pose: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
-            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding SelectedCharacter.Poses, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" IsEnabled="{Binding SelectedCharacter, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedPose, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnPoseSelectionChanged"/>
+            <Label Content="Pose: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80"
+                   HorizontalContentAlignment="Right" />
+            <ComboBox VerticalAlignment="Center"
+                      ItemsSource="{Binding SelectedCharacter.Poses, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      IsEnabled="{Binding SelectedCharacter, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectedItem="{Binding SelectedPose, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectionChanged="OnPoseSelectionChanged" />
         </DockPanel>
         <DockPanel HorizontalAlignment="Left" Margin="10,165,0,0" VerticalAlignment="Top" Width="180">
-            <Label Content="Face: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
-            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding SelectedPose.Faces, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedFace, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnFaceSelectionChanged"/>
+            <Label Content="Face: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80"
+                   HorizontalContentAlignment="Right" />
+            <ComboBox VerticalAlignment="Center" 
+                      IsEnabled="{Binding SelectedDress, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" 
+                      SelectedItem="{Binding SelectedFace, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" 
+                      SelectionChanged="OnFaceSelectionChanged">
+                <ComboBox.ItemsSource>
+                    <MultiBinding Converter="{StaticResource FaceFilterConverter}">
+                        <Binding Path="SelectedPose.Faces" RelativeSource="{RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}"/>
+                        <Binding Path="SelectedDress" RelativeSource="{RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}"/>
+                    </MultiBinding>
+                </ComboBox.ItemsSource>
+            </ComboBox>
         </DockPanel>
         <DockPanel HorizontalAlignment="Left" Margin="10,103,0,0" VerticalAlignment="Top" Width="180">
-            <Label Content="Dress: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
-            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding SelectedPose.Dresses, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedDress, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnSelectionChanged"/>
+            <Label Content="Dress: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80"
+                   HorizontalContentAlignment="Right" />
+            <ComboBox VerticalAlignment="Center"
+                      ItemsSource="{Binding SelectedPose.Dresses, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectedItem="{Binding SelectedDress, Mode=OneWayToSource, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectionChanged="OnSelectionChanged" />
         </DockPanel>
         <DockPanel HorizontalAlignment="Left" Margin="10,134,0,0" VerticalAlignment="Top" Width="180">
-            <Label Content="Addition: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80" HorizontalContentAlignment="Right"/>
-            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding SelectedDress.Additions, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" IsEnabled="{Binding SelectedDress, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectedItem="{Binding SelectedAddition, Mode=TwoWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" SelectionChanged="OnSelectionChanged"/>
+            <Label Content="Addition: " HorizontalAlignment="Left" VerticalAlignment="Top" Width="80"
+                   HorizontalContentAlignment="Right" />
+            <ComboBox VerticalAlignment="Center"
+                      ItemsSource="{Binding SelectedDress.Additions, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      IsEnabled="{Binding SelectedDress, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectedItem="{Binding SelectedAddition, Mode=TwoWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                      SelectionChanged="OnSelectionChanged" />
         </DockPanel>
-        <Button Content="Export" HorizontalAlignment="Left" Margin="39,0,0,10" Width="151" Height="24" VerticalAlignment="Bottom" IsEnabled="{Binding Image, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" Click="OnExportClick"/>
-        <Button Content="⋮" HorizontalAlignment="Left" Margin="10,0,0,10" Width="24" Height="24" VerticalAlignment="Bottom" Tag="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" Click="OnExtraMenuClick" ContextMenuService.IsEnabled="false">
+        <Button Content="Export" HorizontalAlignment="Left" Margin="39,0,0,10" Width="151" Height="24"
+                VerticalAlignment="Bottom"
+                IsEnabled="{Binding Image, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                Click="OnExportClick" />
+        <Button Content="⋮" HorizontalAlignment="Left" Margin="10,0,0,10" Width="24" Height="24"
+                VerticalAlignment="Bottom"
+                Tag="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                Click="OnExtraMenuClick" ContextMenuService.IsEnabled="false">
             <Button.ContextMenu>
-                <ContextMenu DataContext="{Binding Path=PlacementTarget.Tag, RelativeSource={RelativeSource Self}}" Placement="Left">
-                    <MenuItem Header="Batch Export" Click="OnBatchExportClick"/>
-                    <MenuItem Click="OnBatchExportClick" Tag="Character" IsEnabled="{Binding SelectedCharacter, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
+                <ContextMenu DataContext="{Binding Path=PlacementTarget.Tag, RelativeSource={RelativeSource Self}}"
+                             Placement="Left">
+                    <MenuItem Header="Batch Export" Click="OnBatchExportClick" />
+                    <MenuItem Click="OnBatchExportClick" Tag="Character"
+                              IsEnabled="{Binding SelectedCharacter, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
                         <MenuItem.Header>
-                            <MultiBinding ConverterParameter="Batch Export (Limit to {0})"  Converter="{StaticResource ToStringConverter}">
-                                <Binding Path="SelectedCharacter" TargetNullValue="Character"/>
+                            <MultiBinding ConverterParameter="Batch Export (Limit to {0})"
+                                          Converter="{StaticResource ToStringConverter}">
+                                <Binding Path="SelectedCharacter" TargetNullValue="Character" />
                             </MultiBinding>
                         </MenuItem.Header>
                     </MenuItem>
-                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose" IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
+                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose"
+                              IsEnabled="{Binding SelectedPose, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
                         <MenuItem.Header>
-                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1})"  Converter="{StaticResource ToStringConverter}">
-                                <Binding Path="SelectedCharacter" TargetNullValue="Character"/>
-                                <Binding Path="SelectedPose" TargetNullValue="Pose"/>
+                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1})"
+                                          Converter="{StaticResource ToStringConverter}">
+                                <Binding Path="SelectedCharacter" TargetNullValue="Character" />
+                                <Binding Path="SelectedPose" TargetNullValue="Pose" />
                             </MultiBinding>
                         </MenuItem.Header>
                     </MenuItem>
-                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size,Dress" IsEnabled="{Binding SelectedDress, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
+                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size,Dress"
+                              IsEnabled="{Binding SelectedDress, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
                         <MenuItem.Header>
-                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2})"  Converter="{StaticResource ToStringConverter}">
-                                <Binding Path="SelectedCharacter" TargetNullValue="Character"/>
-                                <Binding Path="SelectedPose" TargetNullValue="Pose"/>
-                                <Binding Path="SelectedDress" TargetNullValue="Dress"/>
+                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2})"
+                                          Converter="{StaticResource ToStringConverter}">
+                                <Binding Path="SelectedCharacter" TargetNullValue="Character" />
+                                <Binding Path="SelectedPose" TargetNullValue="Pose" />
+                                <Binding Path="SelectedDress" TargetNullValue="Dress" />
                             </MultiBinding>
                         </MenuItem.Header>
                     </MenuItem>
-                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size,Dress,Addition" IsEnabled="{Binding SelectedAddition, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
+                    <MenuItem Click="OnBatchExportClick" Tag="Character,Pose,Size,Dress,Addition"
+                              IsEnabled="{Binding SelectedAddition, Converter={StaticResource SelectionAvailabilityConverter}, Mode=OneWay}">
                         <MenuItem.Header>
-                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2} - {3})"  Converter="{StaticResource ToStringConverter}">
-                                <Binding Path="SelectedCharacter" TargetNullValue="Character"/>
-                                <Binding Path="SelectedPose" TargetNullValue="Pose"/>
-                                <Binding Path="SelectedDress" TargetNullValue="Dress"/>
-                                <Binding Path="SelectedAddition" TargetNullValue="Addition"/>
+                            <MultiBinding ConverterParameter="Batch Export (Limit to {0} - {1} - {2} - {3})"
+                                          Converter="{StaticResource ToStringConverter}">
+                                <Binding Path="SelectedCharacter" TargetNullValue="Character" />
+                                <Binding Path="SelectedPose" TargetNullValue="Pose" />
+                                <Binding Path="SelectedDress" TargetNullValue="Dress" />
+                                <Binding Path="SelectedAddition" TargetNullValue="Addition" />
                             </MultiBinding>
                         </MenuItem.Header>
                     </MenuItem>
                 </ContextMenu>
             </Button.ContextMenu>
         </Button>
-        <Label Content="{Binding ImageSize, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" HorizontalAlignment="Right" Margin="0,0,10,5" VerticalAlignment="Bottom" Height="45" Width="424" HorizontalContentAlignment="Right" VerticalContentAlignment="Bottom" Padding="0" FontWeight="Bold" Foreground="#66000000" FontSize="24"/>
+        <Label
+            Content="{Binding ImageSize, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+            HorizontalAlignment="Right" Margin="0,0,10,5" VerticalAlignment="Bottom" Height="45" Width="424"
+            HorizontalContentAlignment="Right" VerticalContentAlignment="Bottom" Padding="0" FontWeight="Bold"
+            Foreground="#66000000" FontSize="24" />
 
     </Grid>
 </Window>

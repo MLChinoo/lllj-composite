@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -34,14 +34,30 @@ namespace atri_composite
             for (i++; i < jArr.Count; i++)
             {
                 Layer item = jArr[i].ToObject<Layer>();
-                item.Path = imagePrefix + item.LayerID;
-                if (File.Exists(item.Path + ".png"))
+                var baseLayerPath = imagePrefix + item.LayerID;
+                var pngPath = Utils.FindFile(baseLayerPath + ".png");
+                if (pngPath != null)
                 {
-                    item.Path = imagePrefix + item.LayerID + ".png";
+                    item.Path = pngPath;
                 }
                 else
                 {
-                    item.Path = imagePrefix + item.LayerID + ".tlg";
+                    var tlgPath = Utils.FindFile(baseLayerPath + ".tlg");
+                    if (tlgPath != null)
+                    {
+                        item.Path = tlgPath;
+                    }
+                    else
+                    {
+                        if (File.Exists(baseLayerPath + ".png"))
+                        {
+                            item.Path = baseLayerPath + ".png";
+                        }
+                        else
+                        {
+                            item.Path = baseLayerPath + ".tlg";
+                        }
+                    }
                 }
 
                 flatLayers.Add(item);
@@ -79,6 +95,9 @@ namespace atri_composite
                 if (s == "dummy") continue;
                 var layer = GetLayer(s);
                 if (layer == null) throw new ArgumentException();
+                
+                //if (layer.Visible == 0)
+                //    continue;
 
                 Bitmap layerBitmap;
                 FreeMote.Tlg.TlgLoader tlgLoader = null;
@@ -118,6 +137,9 @@ namespace atri_composite
                             break;
                         case KrBlendMode.ltPsMultiplicative:
                             BlendPsMultiplicative(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity);
+                            break;
+                        case KrBlendMode.ltPsColorDodge:
+                            BlendPsColorDodge(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity);
                             break;
                         default:
                             throw new NotSupportedException($"Blend mode {layer.Type} is not supported.");
@@ -271,6 +293,82 @@ namespace atri_composite
                             basePixel[1] = (byte)((bg * invA + mg * a + 127) / 255);
                             basePixel[2] = (byte)((br * invA + mr * a + 127) / 255);
                             
+                            int outA = ba + ((255 - ba) * a + 127) / 255;
+                            if (outA > 255) outA = 255;
+                            basePixel[3] = (byte)outA;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                baseBmp.UnlockBits(baseData);
+                topBmp.UnlockBits(topData);
+            }
+        }
+
+        private static void BlendPsColorDodge(Bitmap baseBmp, Bitmap topBmp, int offsetX, int offsetY, int opacity)
+        {
+            var rectBase = new Rectangle(0, 0, baseBmp.Width, baseBmp.Height);
+            var rectTop = new Rectangle(0, 0, topBmp.Width, topBmp.Height);
+
+            var baseData = baseBmp.LockBits(rectBase, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+            var topData = topBmp.LockBits(rectTop, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+
+            try
+            {
+                int baseStride = baseData.Stride;
+                int topStride = topData.Stride;
+
+                int startX = Math.Max(0, offsetX);
+                int startY = Math.Max(0, offsetY);
+                int endX = Math.Min(baseBmp.Width, offsetX + topBmp.Width);
+                int endY = Math.Min(baseBmp.Height, offsetY + topBmp.Height);
+
+                if (startX >= endX || startY >= endY) return;
+
+                unsafe
+                {
+                    byte* baseScan0 = (byte*)baseData.Scan0;
+                    byte* topScan0 = (byte*)topData.Scan0;
+
+                    for (int yBase = startY; yBase < endY; yBase++)
+                    {
+                        int yTop = yBase - offsetY;
+
+                        byte* baseRow = baseScan0 + yBase * baseStride;
+                        byte* topRow = topScan0 + yTop * topStride;
+
+                        for (int xBase = startX; xBase < endX; xBase++)
+                        {
+                            int xTop = xBase - offsetX;
+
+                            byte* basePixel = baseRow + xBase * 4;
+                            byte* topPixel = topRow + xTop * 4;
+
+                            byte pa = topPixel[3];
+                            if (pa == 0) continue;
+
+                            int a = (pa * opacity + 127) / 255;
+                            int invA = 255 - a;
+
+                            byte tb = topPixel[0];
+                            byte tg = topPixel[1];
+                            byte tr = topPixel[2];
+
+                            byte bb = basePixel[0];
+                            byte bg = basePixel[1];
+                            byte br = basePixel[2];
+                            byte ba = basePixel[3];
+
+                            byte db = tb == 255 ? (byte)255 : (byte)Math.Min(255, (bb * 255) / (255 - tb));
+                            byte dg = tg == 255 ? (byte)255 : (byte)Math.Min(255, (bg * 255) / (255 - tg));
+                            byte dr = tr == 255 ? (byte)255 : (byte)Math.Min(255, (br * 255) / (255 - tr));
+
+                            basePixel[0] = (byte)((bb * invA + db * a + 127) / 255);
+                            basePixel[1] = (byte)((bg * invA + dg * a + 127) / 255);
+                            basePixel[2] = (byte)((br * invA + dr * a + 127) / 255);
+
                             int outA = ba + ((255 - ba) * a + 127) / 255;
                             if (outA > 255) outA = 255;
                             basePixel[3] = (byte)outA;

@@ -1,4 +1,4 @@
-﻿using Microsoft.WindowsAPICodePack.Dialogs;
+using Microsoft.WindowsAPICodePack.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -73,23 +73,23 @@ namespace atri_composite
         private Character.Pose.Face _selectedFace;
         public Character.Pose.Face SelectedFace { get => _selectedFace; set => OnPropertyChanged(_selectedFace = value); }
 
-        private string WorkingDirectory { get; }
+        private string WorkingDirectory => Utils.WorkingDirectories.FirstOrDefault() ?? "";
 
         public MainWindow()
         {
-            var dialog = new CommonOpenFileDialog()
+            var dialog = new FolderSelectWindow();
+            if (dialog.ShowDialog() != true)
             {
-                Title = "Locate the fgimage folder",
-                DefaultDirectory = Environment.CurrentDirectory,
-                IsFolderPicker = true,
-                EnsureFileExists = true,
-                EnsurePathExists = true,
-                EnsureValidNames = true
-            };
-            if (dialog.ShowDialog() != CommonFileDialogResult.Ok) Environment.Exit(0);
+                Environment.Exit(0);
+            }
 
-            WorkingDirectory = dialog.FileName;
-            Characters = CharacterProcessor.Load(WorkingDirectory);
+            var progress = new ProgressWindow(dialog.SelectedFolders);
+            if (progress.ShowDialog() != true)
+            {
+                Environment.Exit(0);
+            }
+
+            Characters = CharacterProcessor.Load();
 
             InitializeComponent();
         }
@@ -98,12 +98,17 @@ namespace atri_composite
         {
             if (SelectedCharacter != null && SelectedPose != null && SelectedDress != null && SelectedAddition != null && SelectedFace != null && !PauseGenerate)
             {
-                var pbdPath = Path.Combine(WorkingDirectory, SelectedCharacter.Name, $"{SelectedPose.Name}.pbd");
+                var pbdPath = Utils.FindFile(Path.Combine(SelectedCharacter.Name, $"{SelectedPose.Name}.pbd"))
+                              ?? Utils.FindFile($"{SelectedPose.Name}.pbd");
 
-                // also allow images to be placed in the data root
-                if (!File.Exists(pbdPath))
+                if (pbdPath == null)
                 {
-                    pbdPath = Path.Combine(Directory.GetParent(Path.GetDirectoryName(pbdPath)).FullName, Path.GetFileName(pbdPath));
+                    // also allow images to be placed in the data root
+                    pbdPath = Path.Combine(WorkingDirectory, SelectedCharacter.Name, $"{SelectedPose.Name}.pbd");
+                    if (!File.Exists(pbdPath))
+                    {
+                        pbdPath = Path.Combine(Directory.GetParent(Path.GetDirectoryName(pbdPath)).FullName, Path.GetFileName(pbdPath));
+                    }
                 }
 
                 var image = new CompoundImage(pbdPath);
@@ -208,6 +213,43 @@ namespace atri_composite
         public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
         {
             return string.Format(parameter as string, values);
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+    
+    public class FaceFilterConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values.Length < 2 || values[0] == null) return null;
+            
+            var allFaces = values[0] as IEnumerable<Character.Pose.Face>;
+            var selectedDress = values[1] as Character.Pose.Dress;
+
+            if (allFaces == null) return null;
+
+            string currentDressName = selectedDress?.Name;
+            
+            return allFaces.Where(face =>
+            {
+                if (string.IsNullOrEmpty(face.Name)) return false;
+
+                if (face.Name.Contains("@"))
+                {
+                    var parts = face.Name.Split('@');
+                    if (parts.Length > 1)
+                    {
+                        return parts[1] == currentDressName;
+                    }
+                    return false;
+                }
+                
+                return true; 
+            }).ToList();
         }
 
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)

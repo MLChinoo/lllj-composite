@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -9,10 +9,10 @@ namespace atri_composite
 {
     public class CharacterProcessor
     {
-        public static List<Character> Load(string fgimageDir)
+        public static List<Character> Load(string fgimageDir = null)
         {
             var characters = new List<Character>();
-            var standFiles = Directory.GetFiles(fgimageDir, "*.stand");
+            var standFiles = Utils.GetStandFiles();
             foreach (var file in standFiles)
             {
                 var character = new Character() { Name = Path.GetFileNameWithoutExtension(file) };
@@ -23,13 +23,22 @@ namespace atri_composite
                     var name = m;
 
                     var pose = new Character.Pose();
-                    try
+                    var infoPath = Utils.FindFile(name + "_info.txt") ?? Utils.FindFile(name + ".sinfo");
+                    if (infoPath != null)
                     {
-                        pose = ProcessStandInfo(Path.Combine(fgimageDir, name + ".sinfo"));
+                        pose = ProcessStandInfo(infoPath);
                     }
-                    catch (FileNotFoundException)
+                    else
                     {
-                        pose = ProcessStandInfo(Path.Combine(fgimageDir, name + "_info.txt"));
+                        var fallbackDir = fgimageDir ?? (Utils.WorkingDirectories.FirstOrDefault() ?? "");
+                        try
+                        {
+                            pose = ProcessStandInfo(Path.Combine(fallbackDir, name + "_info.txt"));
+                        }
+                        catch (FileNotFoundException)
+                        {
+                            pose = ProcessStandInfo(Path.Combine(fallbackDir, name + ".sinfo"));
+                        }
                     }
                     pose.Name = name;
                     character.Poses.Add(pose);
@@ -53,12 +62,14 @@ namespace atri_composite
                 {
                     case "dress":
                         var dressName = blocks[paramIndex++];
-                        if (!pose.Dresses.Exists(o => o.Name == dressName)) pose.Dresses.Add(new Character.Pose.Dress() { Name = dressName });
+                        if (!pose.Dresses.Exists(o => o.Name == dressName))
+                            pose.Dresses.Add(new Character.Pose.Dress() { Name = dressName });
                         var dress = pose.Dresses.First(o => o.Name == dressName);
                         string additionType = blocks[paramIndex++];
                         string additionName = blocks[paramIndex++];
                         string dressLayerPath = blocks[paramIndex++];
-                        if (!dress.Additions.Exists(o => o.Name == additionName)) dress.Additions.Add(new Character.Pose.Dress.Addition() { Name = additionName });
+                        if (!dress.Additions.Exists(o => o.Name == additionName))
+                            dress.Additions.Add(new Character.Pose.Dress.Addition() { Name = additionName });
                         var addition = dress.Additions.First(o => o.Name == additionName);
                         addition.LayerPaths.Add(dressLayerPath);
                         break;
@@ -66,7 +77,8 @@ namespace atri_composite
                         string faceName = blocks[paramIndex++];
                         string faceType = blocks[paramIndex++];
                         string faceLayerPath = blocks[paramIndex++];
-                        if (!pose.Faces.Exists(o => o.Name == faceName)) pose.Faces.Add(new Character.Pose.Face() {Name = faceName});
+                        if (!pose.Faces.Exists(o => o.Name == faceName))
+                            pose.Faces.Add(new Character.Pose.Face() {Name = faceName});
                         var face = pose.Faces.First(o => o.Name == faceName);
                         face.LayerPaths.Add(faceLayerPath);
                         break;

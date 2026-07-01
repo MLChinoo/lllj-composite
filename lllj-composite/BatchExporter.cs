@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -34,12 +34,17 @@ namespace atri_composite
             var errors = EnumerateVariants(limit).AsParallel().WithDegreeOfParallelism(Environment.ProcessorCount * 4).Select(_ =>
             {
                 var (character, pose, dress, face, addition) = _;
-                var pbdPath = Path.Combine(WorkingDirectory, character.Name, $"{pose.Name}.pbd");
+                var pbdPath = Utils.FindFile(Path.Combine(character.Name, $"{pose.Name}.pbd"))
+                              ?? Utils.FindFile($"{pose.Name}.pbd");
 
-                // also allow images to be placed in the data root
-                if (!File.Exists(pbdPath))
+                if (pbdPath == null)
                 {
-                    pbdPath = Path.Combine(Directory.GetParent(Path.GetDirectoryName(pbdPath)).FullName, Path.GetFileName(pbdPath));
+                    // also allow images to be placed in the data root
+                    pbdPath = Path.Combine(WorkingDirectory, character.Name, $"{pose.Name}.pbd");
+                    if (!File.Exists(pbdPath))
+                    {
+                        pbdPath = Path.Combine(Directory.GetParent(Path.GetDirectoryName(pbdPath)).FullName, Path.GetFileName(pbdPath));
+                    }
                 }
 
                 var image = new CompoundImage(pbdPath);
