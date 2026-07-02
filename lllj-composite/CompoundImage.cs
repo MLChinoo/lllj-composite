@@ -116,30 +116,16 @@ namespace atri_composite
                     switch (layer.Type)
                     {
                         case KrBlendMode.ltPsNormal:
-                            using (var g = Graphics.FromImage(bitmap))
-                            {
-                                var ia = new ImageAttributes();
-
-                                float op = layer.Opacity / 255f;
-                                ColorMatrix cm = new ColorMatrix { Matrix33 = op };
-
-                                ia.SetColorMatrix(cm);
-
-                                g.DrawImage(layerBitmap,
-                                    new Rectangle(layer.Left, layer.Top, layer.Width, layer.Height),
-                                    0, 0, layer.Width, layer.Height,
-                                    GraphicsUnit.Pixel,
-                                    ia);
-                            }
+                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsNormalCore, updateAlpha: true);
                             break;
                         case KrBlendMode.ltPsDarken:
-                            BlendPsDarken(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity);
+                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsDarkenCore, updateAlpha: false);
                             break;
                         case KrBlendMode.ltPsMultiplicative:
-                            BlendPsMultiplicative(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity);
+                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsMultiplyCore, updateAlpha: false);
                             break;
                         case KrBlendMode.ltPsColorDodge:
-                            BlendPsColorDodge(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity);
+                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsColorDodgeCore, updateAlpha: false);
                             break;
                         default:
                             throw new NotSupportedException($"Blend mode {layer.Type} is not supported.");
@@ -154,7 +140,14 @@ namespace atri_composite
             return bitmap;
         }
 
-        private static void BlendPsDarken(Bitmap baseBmp, Bitmap topBmp, int offsetX, int offsetY, int opacity)
+        private static void BlendKrkrzPs(
+            Bitmap baseBmp,
+            Bitmap topBmp,
+            int offsetX,
+            int offsetY,
+            int opacity,
+            Func<int, int, int> blendCore,
+            bool updateAlpha)
         {
             var rectBase = new Rectangle(0, 0, baseBmp.Width, baseBmp.Height);
             var rectTop = new Rectangle(0, 0, topBmp.Width, topBmp.Height);
@@ -193,32 +186,37 @@ namespace atri_composite
                             byte* basePixel = baseRow + xBase * 4;
                             byte* topPixel = topRow + xTop * 4;
 
-                            byte tb = topPixel[0];
-                            byte tg = topPixel[1];
-                            byte tr = topPixel[2];
-                            byte ta = topPixel[3];
-
+                            int ta = topPixel[3];
                             if (ta == 0) continue;
 
-                            byte bb = basePixel[0];
-                            byte bg = basePixel[1];
-                            byte br = basePixel[2];
-                            byte ba = basePixel[3];
+                            // krkrz translucent_op: if opacity is used, a = ((srcA * opacity) >> 8).
+                            // When opacity is fully opaque, use normal_op's a = srcA to avoid 255 becoming 254.
+                            int a = opacity >= 255 ? ta : ((ta * opacity) >> 8);
+                            if (a == 0) continue;
 
-                            byte db = bb < tb ? bb : tb;
-                            byte dg = bg < tg ? bg : tg;
-                            byte dr = br < tr ? br : tr;
+                            int bb = basePixel[0];
+                            int bg = basePixel[1];
+                            int br = basePixel[2];
+                            int ba = basePixel[3];
 
-                            int a = (ta * opacity + 127) / 255;
-                            int invA = 255 - a;
+                            int tb = topPixel[0];
+                            int tg = topPixel[1];
+                            int tr = topPixel[2];
 
-                            basePixel[0] = (byte)((bb * invA + db * a + 127) / 255);
-                            basePixel[1] = (byte)((bg * invA + dg * a + 127) / 255);
-                            basePixel[2] = (byte)((br * invA + dr * a + 127) / 255);
+                            int db = blendCore(bb, tb);
+                            int dg = blendCore(bg, tg);
+                            int dr = blendCore(br, tr);
 
-                            int outA = ba + ((255 - ba) * a + 127) / 255;
-                            if (outA > 255) outA = 255;
-                            basePixel[3] = (byte)outA;
+                            basePixel[0] = (byte)PsAlphaBlendChannel(bb, db, a);
+                            basePixel[1] = (byte)PsAlphaBlendChannel(bg, dg, a);
+                            basePixel[2] = (byte)PsAlphaBlendChannel(br, dr, a);
+
+                            // krkrz Photoshop/HDA variants keep destination alpha.
+                            // Only ltPsNormal is documented as ltAlpha-equivalent, so keep alpha output usable there.
+                            if (updateAlpha)
+                            {
+                                basePixel[3] = (byte)AlphaBlendChannel(ba, ta, opacity);
+                            }
                         }
                     }
                 }
@@ -230,157 +228,38 @@ namespace atri_composite
             }
         }
 
-        private static void BlendPsMultiplicative(Bitmap baseBmp, Bitmap topBmp, int offsetX, int offsetY, int opacity)
+        private static int PsNormalCore(int dest, int src)
         {
-            var rectBase = new Rectangle(0, 0, baseBmp.Width, baseBmp.Height);
-            var rectTop = new Rectangle(0, 0, topBmp.Width, topBmp.Height);
-
-            var baseData = baseBmp.LockBits(rectBase, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-            var topData = topBmp.LockBits(rectTop, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-
-            try
-            {
-                int baseStride = baseData.Stride;
-                int topStride = topData.Stride;
-
-                int startX = Math.Max(0, offsetX);
-                int startY = Math.Max(0, offsetY);
-                int endX = Math.Min(baseBmp.Width, offsetX + topBmp.Width);
-                int endY = Math.Min(baseBmp.Height, offsetY + topBmp.Height);
-
-                if (startX >= endX || startY >= endY)
-                    return;
-
-                unsafe
-                {
-                    byte* baseScan0 = (byte*)baseData.Scan0;
-                    byte* topScan0 = (byte*)topData.Scan0;
-
-                    for (int yBase = startY; yBase < endY; yBase++)
-                    {
-                        int yTop = yBase - offsetY;
-
-                        byte* baseRow = baseScan0 + yBase * baseStride;
-                        byte* topRow = topScan0 + yTop * topStride;
-
-                        for (int xBase = startX; xBase < endX; xBase++)
-                        {
-                            int xTop = xBase - offsetX;
-
-                            byte* basePixel = baseRow + xBase * 4;
-                            byte* topPixel = topRow + xTop * 4;
-
-                            byte pa = topPixel[3];
-                            if (pa == 0) continue;
-                            
-                            int a = (pa * opacity + 127) / 255;
-                            int invA = 255 - a;
-
-                            byte tb = topPixel[0];
-                            byte tg = topPixel[1];
-                            byte tr = topPixel[2];
-
-                            byte bb = basePixel[0];
-                            byte bg = basePixel[1];
-                            byte br = basePixel[2];
-                            byte ba = basePixel[3];
-                            
-                            byte mb = (byte)((bb * tb + 127) / 255);
-                            byte mg = (byte)((bg * tg + 127) / 255);
-                            byte mr = (byte)((br * tr + 127) / 255);
-                            
-                            basePixel[0] = (byte)((bb * invA + mb * a + 127) / 255);
-                            basePixel[1] = (byte)((bg * invA + mg * a + 127) / 255);
-                            basePixel[2] = (byte)((br * invA + mr * a + 127) / 255);
-                            
-                            int outA = ba + ((255 - ba) * a + 127) / 255;
-                            if (outA > 255) outA = 255;
-                            basePixel[3] = (byte)outA;
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                baseBmp.UnlockBits(baseData);
-                topBmp.UnlockBits(topData);
-            }
+            return src;
         }
 
-        private static void BlendPsColorDodge(Bitmap baseBmp, Bitmap topBmp, int offsetX, int offsetY, int opacity)
+        private static int PsDarkenCore(int dest, int src)
         {
-            var rectBase = new Rectangle(0, 0, baseBmp.Width, baseBmp.Height);
-            var rectTop = new Rectangle(0, 0, topBmp.Width, topBmp.Height);
+            return dest < src ? dest : src;
+        }
 
-            var baseData = baseBmp.LockBits(rectBase, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-            var topData = topBmp.LockBits(rectTop, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        private static int PsMultiplyCore(int dest, int src)
+        {
+            // krkrz ps_mul_blend_func uses >> 8, not / 255.
+            return (dest * src) >> 8;
+        }
 
-            try
-            {
-                int baseStride = baseData.Stride;
-                int topStride = topData.Stride;
+        private static int PsColorDodgeCore(int dest, int src)
+        {
+            // krkrz ps_color_dodge_table: ((255-src)<=dest) ? 255 : (dest*255)/(255-src)
+            return (255 - src) <= dest ? 255 : (dest * 255) / (255 - src);
+        }
 
-                int startX = Math.Max(0, offsetX);
-                int startY = Math.Max(0, offsetY);
-                int endX = Math.Min(baseBmp.Width, offsetX + topBmp.Width);
-                int endY = Math.Min(baseBmp.Height, offsetY + topBmp.Height);
+        private static int PsAlphaBlendChannel(int dest, int src, int alpha)
+        {
+            // krkrz ps_alpha_blend_func: dest + (((src - dest) * alpha) >> 8)
+            return dest + (((src - dest) * alpha) >> 8);
+        }
 
-                if (startX >= endX || startY >= endY) return;
-
-                unsafe
-                {
-                    byte* baseScan0 = (byte*)baseData.Scan0;
-                    byte* topScan0 = (byte*)topData.Scan0;
-
-                    for (int yBase = startY; yBase < endY; yBase++)
-                    {
-                        int yTop = yBase - offsetY;
-
-                        byte* baseRow = baseScan0 + yBase * baseStride;
-                        byte* topRow = topScan0 + yTop * topStride;
-
-                        for (int xBase = startX; xBase < endX; xBase++)
-                        {
-                            int xTop = xBase - offsetX;
-
-                            byte* basePixel = baseRow + xBase * 4;
-                            byte* topPixel = topRow + xTop * 4;
-
-                            byte pa = topPixel[3];
-                            if (pa == 0) continue;
-
-                            int a = (pa * opacity + 127) / 255;
-                            int invA = 255 - a;
-
-                            byte tb = topPixel[0];
-                            byte tg = topPixel[1];
-                            byte tr = topPixel[2];
-
-                            byte bb = basePixel[0];
-                            byte bg = basePixel[1];
-                            byte br = basePixel[2];
-                            byte ba = basePixel[3];
-
-                            byte db = tb == 255 ? (byte)255 : (byte)Math.Min(255, (bb * 255) / (255 - tb));
-                            byte dg = tg == 255 ? (byte)255 : (byte)Math.Min(255, (bg * 255) / (255 - tg));
-                            byte dr = tr == 255 ? (byte)255 : (byte)Math.Min(255, (br * 255) / (255 - tr));
-
-                            basePixel[0] = (byte)((bb * invA + db * a + 127) / 255);
-                            basePixel[1] = (byte)((bg * invA + dg * a + 127) / 255);
-                            basePixel[2] = (byte)((br * invA + dr * a + 127) / 255);
-
-                            int outA = ba + ((255 - ba) * a + 127) / 255;
-                            if (outA > 255) outA = 255;
-                            basePixel[3] = (byte)outA;
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                baseBmp.UnlockBits(baseData);
-                topBmp.UnlockBits(topData);
-            }
+        private static int AlphaBlendChannel(int destAlpha, int srcAlpha, int opacity)
+        {
+            int a = opacity >= 255 ? srcAlpha : ((srcAlpha * opacity) >> 8);
+            return 255 - ((255 - destAlpha) * (255 - a)) / 255;
         }
 
         public enum KrBlendMode
