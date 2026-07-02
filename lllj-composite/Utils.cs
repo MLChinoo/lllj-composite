@@ -82,6 +82,67 @@ namespace atri_composite
             ".stand", ".sinfo", ".txt", ".pbd", ".png", ".tlg"
         };
 
+        private static readonly HashSet<string> excludedFolderNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "_nude",
+            "裸加工"
+        };
+
+        public static readonly List<EncodingInfo> AvailableEncodings = new List<EncodingInfo>
+        {
+            new EncodingInfo("Shift-JIS", Encoding.GetEncoding(932)),
+            new EncodingInfo("UTF-16LE BOM", Encoding.Unicode),
+            new EncodingInfo("UTF-16LE", new UnicodeEncoding(false, false)),
+        };
+
+        public static Encoding StandEncoding { get; set; } = Encoding.Unicode;
+        public static Encoding SinfoEncoding { get; set; } = Encoding.Unicode;
+        public static Encoding PbdEncoding { get; set; } = Encoding.Unicode;
+
+        public static readonly List<EncodingPreset> AvailablePresets = new List<EncodingPreset>
+        {
+            new EncodingPreset(
+                "国际中文版",
+                Encoding.Unicode,                    // .stand
+                Encoding.Unicode,                    // .sinfo / _info.txt
+                Encoding.Unicode                     // .pbd fallback .txt
+            ),
+            new EncodingPreset(
+                "日文原版",
+                Encoding.GetEncoding(932),           // .stand: Shift-JIS
+                Encoding.GetEncoding(932),           // .sinfo: Shift-JIS
+                new UnicodeEncoding(false, false)    // .pbd txt: UTF-16 LE no BOM
+            ),
+        };
+
+        public class EncodingInfo
+        {
+            public string DisplayName { get; }
+            public Encoding Encoding { get; }
+            public EncodingInfo(string displayName, Encoding encoding)
+            {
+                DisplayName = displayName;
+                Encoding = encoding;
+            }
+            public override string ToString() => DisplayName;
+        }
+
+        public class EncodingPreset
+        {
+            public string Name { get; }
+            public Encoding StandEncoding { get; }
+            public Encoding SinfoEncoding { get; }
+            public Encoding PbdEncoding { get; }
+            public EncodingPreset(string name, Encoding stand, Encoding sinfo, Encoding pbd)
+            {
+                Name = name;
+                StandEncoding = stand;
+                SinfoEncoding = sinfo;
+                PbdEncoding = pbd;
+            }
+            public override string ToString() => Name;
+        }
+
         public static List<string> WorkingDirectories { get; private set; } = new List<string>();
         private static readonly Dictionary<string, List<string>> fileLookupCache = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -133,8 +194,11 @@ namespace atri_composite
                 }
             }
             allDirs = allDirs.Select(Path.GetFullPath)
-                // riddle_steam_dumps/fgimage/_nude文件夹下的png会干扰读取同名tlg
-                .Where(dir => !dir.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Contains("_nude", StringComparer.OrdinalIgnoreCase))
+                .Where(dir =>
+                {
+                    var parts = dir.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    return !parts.Any(p => excludedFolderNames.Contains(p));
+                })
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
             int totalDirs = allDirs.Count;
@@ -262,20 +326,97 @@ namespace atri_composite
             }
 
             return pbdCache.GetOrAdd(pbdPath, o =>
-              {
-                  var proc = Process.Start(new ProcessStartInfo()
-                  {
-                      FileName = "cmd.exe",
-                      Arguments = $"/C chcp 65001 > nul && pbd2json.exe \"{pbdPath}\"",
-                      UseShellExecute = false,
-                      RedirectStandardOutput = true,
-                      CreateNoWindow = true,
-                      StandardOutputEncoding = Encoding.UTF8
-                  });
-                  var json = proc.StandardOutput.ReadToEnd();
-                  proc.WaitForExit();
-                  return JArray.Parse(normalize ? json.Normalize(NormalizationForm.FormKC) : json);
-              });
+            {
+                if (File.Exists(o))
+                {
+                    var proc = Process.Start(new ProcessStartInfo()
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = $"/C chcp 65001 > nul && pbd2json.exe \"{o}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        CreateNoWindow = true,
+                        StandardOutputEncoding = Encoding.UTF8
+                    });
+                    var json = proc.StandardOutput.ReadToEnd();
+                    proc.WaitForExit();
+                    return JArray.Parse(normalize ? json.Normalize(NormalizationForm.FormKC) : json);
+                }
+
+                // Fallback: try .txt file (older game format)
+                var txtPath = Path.ChangeExtension(o, ".txt");
+                var resolvedTxt = FindFile(txtPath);
+                if (resolvedTxt != null) txtPath = resolvedTxt;
+                if (!File.Exists(txtPath))
+                    throw new FileNotFoundException("Cannot find PBD or TXT file for: " + o);
+                return LoadTxtFile(txtPath);
+            });
+        }
+
+
+        private static JArray LoadTxtFile(string txtPath)
+        {
+            var lines = File.ReadAllLines(txtPath, PbdEncoding);
+            var jArr = new JArray();
+
+            // Line 0 is the #header comment, line 1 has canvas dimensions
+            int canvasWidth = 0, canvasHeight = 0;
+            if (lines.Length > 1)
+            {
+                var dimCols = lines[1].Split('\t');
+                if (dimCols.Length > 4)
+                {
+                    int.TryParse(dimCols[4], out canvasWidth);
+                    int.TryParse(dimCols[5], out canvasHeight);
+                }
+            }
+            jArr.Add(new JObject
+            {
+                ["width"] = canvasWidth,
+                ["height"] = canvasHeight
+            });
+
+            // Layer data starts from line 2
+            for (int i = 2; i < lines.Length; i++)
+            {
+                var line = lines[i].Trim();
+                if (string.IsNullOrEmpty(line) || line.StartsWith("#")) continue;
+
+                var cols = line.Split('\t');
+                if (cols.Length < 10) continue;
+
+                int.TryParse(cols[0], out int layerType);
+                var name = cols[1];
+                if (string.IsNullOrEmpty(name)) continue;
+
+                int.TryParse(cols[2], out int left);
+                int.TryParse(cols[3], out int top);
+                int.TryParse(cols[4], out int width);
+                int.TryParse(cols[5], out int height);
+                int.TryParse(cols[6], out int blendType);
+                int.TryParse(cols[7], out int opacity);
+                int.TryParse(cols[8], out int visible);
+                int.TryParse(cols[9], out int layerId);
+                int groupLayerId = 0;
+                if (cols.Length > 10) int.TryParse(cols[10], out groupLayerId);
+
+                jArr.Add(new JObject
+                {
+                    ["name"] = name,
+                    ["layer_type"] = layerType,
+                    ["left"] = left,
+                    ["top"] = top,
+                    ["width"] = width,
+                    ["height"] = height,
+                    ["type"] = blendType,
+                    ["opacity"] = opacity,
+                    ["visible"] = visible,
+                    ["layer_id"] = layerId,
+                    ["group_layer_id"] = groupLayerId
+                });
+            }
+
+            return jArr;
         }
 
         [System.Runtime.InteropServices.DllImport("gdi32.dll")]

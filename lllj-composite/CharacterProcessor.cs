@@ -16,7 +16,7 @@ namespace atri_composite
             foreach (var file in standFiles)
             {
                 var character = new Character() { Name = Path.GetFileNameWithoutExtension(file) };
-                var rtxt = Regex.Matches(File.ReadAllText(file, Encoding.Unicode), "filename:'([^']+)'");
+                var rtxt = Regex.Matches(File.ReadAllText(file, Utils.StandEncoding), "filename:'([^']+)'");
                 foreach (Match match in rtxt)
                 {
                     var m = match.Groups[1].Value;
@@ -31,13 +31,20 @@ namespace atri_composite
                     else
                     {
                         var fallbackDir = fgimageDir ?? (Utils.WorkingDirectories.FirstOrDefault() ?? "");
-                        try
+                        var fallbackTxt = Path.Combine(fallbackDir, name + "_info.txt");
+                        var fallbackSinfo = Path.Combine(fallbackDir, name + ".sinfo");
+
+                        if (File.Exists(fallbackTxt))
                         {
-                            pose = ProcessStandInfo(Path.Combine(fallbackDir, name + "_info.txt"));
+                            pose = ProcessStandInfo(fallbackTxt);
                         }
-                        catch (FileNotFoundException)
+                        else if (File.Exists(fallbackSinfo))
                         {
-                            pose = ProcessStandInfo(Path.Combine(fallbackDir, name + ".sinfo"));
+                            pose = ProcessStandInfo(fallbackSinfo);
+                        }
+                        else
+                        {
+                            continue;
                         }
                     }
                     pose.Name = name;
@@ -50,7 +57,7 @@ namespace atri_composite
 
         private static Character.Pose ProcessStandInfo(string sInfoPath)
         {
-            var sInfo = File.ReadAllText(sInfoPath);
+            var sInfo = File.ReadAllText(sInfoPath, Utils.SinfoEncoding);
             var pose = new Character.Pose();
 
             sInfo.Split('\n').Select(o => o.Trim()).ToList().ForEach(expression =>

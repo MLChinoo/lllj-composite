@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using Microsoft.WindowsAPICodePack.Dialogs;
 
@@ -14,10 +15,23 @@ namespace atri_composite
 
         public List<string> SelectedFolders => FolderPaths.ToList();
 
+        public Encoding SelectedStandEncoding { get; private set; } = Encoding.Unicode;
+        public Encoding SelectedSinfoEncoding { get; private set; } = Encoding.Unicode;
+        public Encoding SelectedPbdEncoding { get; private set; } = Encoding.Unicode;
+
         public FolderSelectWindow()
         {
             InitializeComponent();
             lstFolders.ItemsSource = FolderPaths;
+            cmbPreset.ItemsSource = Utils.AvailablePresets;
+            // Presets may reference specific Encoding instances; find them in AvailableEncodings
+            cmbStandEncoding.ItemsSource = Utils.AvailableEncodings;
+            cmbSinfoEncoding.ItemsSource = Utils.AvailableEncodings;
+            cmbPbdEncoding.ItemsSource = Utils.AvailableEncodings;
+
+            // Select first preset (International Chinese)
+            if (cmbPreset.Items.Count > 0)
+                cmbPreset.SelectedIndex = 0;
         }
 
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
@@ -110,6 +124,39 @@ namespace atri_composite
             {
                 FolderPaths.Add(fullPath);
             }
+        }
+        private void CmbPreset_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (cmbPreset.SelectedItem is Utils.EncodingPreset preset)
+            {
+                SelectEncoding(cmbStandEncoding, preset.StandEncoding);
+                SelectEncoding(cmbSinfoEncoding, preset.SinfoEncoding);
+                SelectEncoding(cmbPbdEncoding, preset.PbdEncoding);
+            }
+        }
+
+        private void CmbEncoding_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (cmbStandEncoding.SelectedItem is Utils.EncodingInfo info)
+                SelectedStandEncoding = info.Encoding;
+            if (cmbSinfoEncoding.SelectedItem is Utils.EncodingInfo info2)
+                SelectedSinfoEncoding = info2.Encoding;
+            if (cmbPbdEncoding.SelectedItem is Utils.EncodingInfo info3)
+                SelectedPbdEncoding = info3.Encoding;
+        }
+
+        private static void SelectEncoding(System.Windows.Controls.ComboBox combo, Encoding target)
+        {
+            foreach (Utils.EncodingInfo item in combo.Items)
+            {
+                if (item.Encoding.CodePage == target.CodePage
+                    && item.Encoding.GetPreamble().Length == target.GetPreamble().Length)
+                {
+                    combo.SelectedItem = item;
+                    return;
+                }
+            }
+            combo.SelectedIndex = 0;
         }
     }
 }

@@ -83,6 +83,10 @@ namespace atri_composite
                 Environment.Exit(0);
             }
 
+            Utils.StandEncoding = dialog.SelectedStandEncoding;
+            Utils.SinfoEncoding = dialog.SelectedSinfoEncoding;
+            Utils.PbdEncoding = dialog.SelectedPbdEncoding;
+
             var progress = new ProgressWindow(dialog.SelectedFolders);
             if (progress.ShowDialog() != true)
             {
@@ -124,8 +128,17 @@ namespace atri_composite
                 }
                 catch (Exception e)
                 {
-                    MessageBox.Show(e.Message);
-                    System.Diagnostics.Trace.TraceError(e.Message);
+                    var context =
+                        $"Character: {SelectedCharacter?.Name}\n" +
+                        $"Pose: {SelectedPose?.Name}\n" +
+                        $"Dress: {SelectedDress?.Name}\n" +
+                        $"Addition: {SelectedAddition?.Name}\n" +
+                        $"Face: {SelectedFace?.Name}\n" +
+                        $"PBD: {pbdPath}\n" +
+                        $"Layers: {string.Join(", ", layers)}\n" +
+                        $"\n{e}";
+                    MessageBox.Show(context, "Error building image", MessageBoxButton.OK, MessageBoxImage.Error);
+                    System.Diagnostics.Trace.TraceError(context);
                     Image = null;
                 }
             }
