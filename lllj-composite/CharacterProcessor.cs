@@ -16,41 +16,58 @@ namespace atri_composite
             foreach (var file in standFiles)
             {
                 var character = new Character() { Name = Path.GetFileNameWithoutExtension(file) };
-                var rtxt = Regex.Matches(File.ReadAllText(file, Utils.StandEncoding), "filename:'([^']+)'");
+                MatchCollection rtxt;
+                try
+                {
+                    rtxt = Regex.Matches(File.ReadAllText(file, Utils.StandEncoding), "filename:'([^']+)'");
+                }
+                catch (System.Exception ex)
+                {
+                    Trace.TraceError($"Failed to read stand file {file}: {ex.Message}");
+                    continue;
+                }
+
                 foreach (Match match in rtxt)
                 {
                     var m = match.Groups[1].Value;
                     var name = m;
 
-                    var pose = new Character.Pose();
-                    var infoPath = Utils.FindFile(name + "_info.txt") ?? Utils.FindFile(name + ".sinfo");
-                    if (infoPath != null)
+                    try
                     {
-                        pose = ProcessStandInfo(infoPath);
-                    }
-                    else
-                    {
-                        var fallbackDir = fgimageDir ?? (Utils.WorkingDirectories.FirstOrDefault() ?? "");
-                        var fallbackTxt = Path.Combine(fallbackDir, name + "_info.txt");
-                        var fallbackSinfo = Path.Combine(fallbackDir, name + ".sinfo");
-
-                        if (File.Exists(fallbackTxt))
+                        var pose = new Character.Pose();
+                        var infoPath = Utils.FindFile(name + "_info.txt") ?? Utils.FindFile(name + ".sinfo");
+                        if (infoPath != null)
                         {
-                            pose = ProcessStandInfo(fallbackTxt);
-                        }
-                        else if (File.Exists(fallbackSinfo))
-                        {
-                            pose = ProcessStandInfo(fallbackSinfo);
+                            pose = ProcessStandInfo(infoPath);
                         }
                         else
                         {
-                            continue;
+                            var fallbackDir = fgimageDir ?? (Utils.WorkingDirectories.FirstOrDefault() ?? "");
+                            var fallbackTxt = Path.Combine(fallbackDir, name + "_info.txt");
+                            var fallbackSinfo = Path.Combine(fallbackDir, name + ".sinfo");
+
+                            if (File.Exists(fallbackTxt))
+                            {
+                                pose = ProcessStandInfo(fallbackTxt);
+                            }
+                            else if (File.Exists(fallbackSinfo))
+                            {
+                                pose = ProcessStandInfo(fallbackSinfo);
+                            }
+                            else
+                            {
+                                continue;
+                            }
                         }
+                        pose.Name = name;
+                        character.Poses.Add(pose);
                     }
-                    pose.Name = name;
-                    character.Poses.Add(pose);
+                    catch (System.Exception ex)
+                    {
+                        Trace.TraceError($"Failed to load pose {name} referenced by {file}: {ex.Message}");
+                    }
                 }
-                characters.Add(character);
+                if (character.Poses.Count > 0) characters.Add(character);
             }
             return characters;
         }
@@ -60,14 +77,20 @@ namespace atri_composite
             var sInfo = File.ReadAllText(sInfoPath, Utils.SinfoEncoding);
             var pose = new Character.Pose();
 
-            sInfo.Split('\n').Select(o => o.Trim()).ToList().ForEach(expression =>
+            foreach (var expression in sInfo.Split('\n').Select(o => o.Trim()))
             {
+                if (string.IsNullOrEmpty(expression)) continue;
                 var blocks = expression.Split('\t').Select(p => p.Trim()).ToList();
 
                 var paramIndex = 0;
                 switch (blocks[paramIndex++])
                 {
                     case "dress":
+                        if (blocks.Count < 5)
+                        {
+                            Trace.TraceWarning($"Ignored malformed dress row in {sInfoPath}: {expression}");
+                            continue;
+                        }
                         var dressName = blocks[paramIndex++];
                         if (!pose.Dresses.Exists(o => o.Name == dressName))
                             pose.Dresses.Add(new Character.Pose.Dress() { Name = dressName });
@@ -81,6 +104,11 @@ namespace atri_composite
                         addition.LayerPaths.Add(dressLayerPath);
                         break;
                     case "face":
+                        if (blocks.Count < 4)
+                        {
+                            Trace.TraceWarning($"Ignored malformed face row in {sInfoPath}: {expression}");
+                            continue;
+                        }
                         string faceName = blocks[paramIndex++];
                         string faceType = blocks[paramIndex++];
                         string faceLayerPath = blocks[paramIndex++];
@@ -90,8 +118,23 @@ namespace atri_composite
                         face.LayerPaths.Add(faceLayerPath);
                         break;
                 }
-            });
+            }
             return pose;
+        }
+
+        public static IEnumerable<Character.Pose.Face> GetFacesForDress(
+            IEnumerable<Character.Pose.Face> faces,
+            Character.Pose.Dress dress)
+        {
+            if (faces == null) return Enumerable.Empty<Character.Pose.Face>();
+
+            return faces.Where(face =>
+            {
+                if (string.IsNullOrEmpty(face.Name)) return false;
+                if (!face.Name.Contains("@")) return true;
+                var parts = face.Name.Split('@');
+                return parts.Length > 1 && parts[1] == dress?.Name;
+            });
         }
     }
 }

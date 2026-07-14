@@ -8,6 +8,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 
@@ -29,7 +30,7 @@ namespace atri_composite
             finally
             {
                 DeleteObject(p);
-                if (disposeSource) try { bitmap.Dispose(); } catch { }
+                if (disposeSource) bitmap.Dispose();
             }
         }
 
@@ -37,44 +38,63 @@ namespace atri_composite
         {
             if (bitmap.PixelFormat != PixelFormat.Format32bppArgb) throw new NotSupportedException();
 
-            var bitmapData = bitmap.LockBits(new Rectangle(Point.Empty, bitmap.Size), ImageLockMode.ReadOnly, bitmap.PixelFormat);
-            var bpp = Image.GetPixelFormatSize(bitmapData.PixelFormat) / 8;
-
-            unsafe byte AlphaAt(int x, int y) => *((byte*)bitmapData.Scan0 + bitmapData.Stride * y + bpp * x + 3);
-
             int l = -1, t = -1, r = -1, b = -1;
-            Parallel.Invoke(() =>
+            var bitmapData = bitmap.LockBits(new Rectangle(Point.Empty, bitmap.Size), ImageLockMode.ReadOnly, bitmap.PixelFormat);
+            try
             {
-                for (var ln = 0; ln < bitmapData.Width; ln++)
-                    for (var s = 0; s < bitmapData.Height; s++)
-                        if (AlphaAt(ln, s) != 0) { l = ln; return; }
-            }, () =>
+                var bpp = Image.GetPixelFormatSize(bitmapData.PixelFormat) / 8;
+                unsafe byte AlphaAt(int x, int y) => *((byte*)bitmapData.Scan0 + bitmapData.Stride * y + bpp * x + 3);
+
+                Parallel.Invoke(() =>
+                {
+                    for (var ln = 0; ln < bitmapData.Width; ln++)
+                        for (var s = 0; s < bitmapData.Height; s++)
+                            if (AlphaAt(ln, s) != 0) { l = ln; return; }
+                }, () =>
+                {
+                    for (var ln = 0; ln < bitmapData.Height; ln++)
+                        for (var s = 0; s < bitmapData.Width; s++)
+                            if (AlphaAt(s, ln) != 0) { t = ln; return; }
+                }, () =>
+                {
+                    for (var ln = 0; ln < bitmapData.Width; ln++)
+                        for (var s = 0; s < bitmapData.Height; s++)
+                            if (AlphaAt(bitmapData.Width - 1 - ln, s) != 0) { r = ln; return; }
+                }, () =>
+                {
+                    for (var ln = 0; ln < bitmapData.Height; ln++)
+                        for (var s = 0; s < bitmapData.Width; s++)
+                            if (AlphaAt(s, bitmapData.Height - 1 - ln) != 0) { b = ln; return; }
+                });
+            }
+            finally
             {
-                for (var ln = 0; ln < bitmapData.Height; ln++)
-                    for (var s = 0; s < bitmapData.Width; s++)
-                        if (AlphaAt(s, ln) != 0) { t = ln; return; }
-            }, () =>
+                bitmap.UnlockBits(bitmapData);
+            }
+
+            try
             {
-                for (var ln = 0; ln < bitmapData.Width; ln++)
-                    for (var s = 0; s < bitmapData.Height; s++)
-                        if (AlphaAt(bitmapData.Width - 1 - ln, s) != 0) { r = ln; return; }
-            }, () =>
+                if (l < 0 || t < 0 || r < 0 || b < 0)
+                    throw new ArgumentException("The image contains no visible pixels.", nameof(bitmap));
+
+                var cropBound = new Rectangle(l, t, bitmap.Width - l - r, bitmap.Height - t - b);
+                var newBitmap = new Bitmap(cropBound.Width, cropBound.Height, PixelFormat.Format32bppArgb);
+                try
+                {
+                    using (var g = Graphics.FromImage(newBitmap))
+                        g.DrawImage(bitmap, new Rectangle(Point.Empty, newBitmap.Size), cropBound, GraphicsUnit.Pixel);
+                    return newBitmap;
+                }
+                catch
+                {
+                    newBitmap.Dispose();
+                    throw;
+                }
+            }
+            finally
             {
-                for (var ln = 0; ln < bitmapData.Height; ln++)
-                    for (var s = 0; s < bitmapData.Width; s++)
-                        if (AlphaAt(s, bitmapData.Height - 1 - ln) != 0) { b = ln; return; }
-            });
-
-            bitmap.UnlockBits(bitmapData);
-
-            if (l < 0 || t < 0 || r < 0 || b < 0) throw new ArgumentException();
-
-            var cropBound = new Rectangle(l, t, bitmap.Width - l - r, bitmap.Height - t - b);
-            var newBitmap = new Bitmap(cropBound.Width, cropBound.Height);
-            using (var g = Graphics.FromImage(newBitmap)) g.DrawImage(bitmap, new Rectangle(Point.Empty, newBitmap.Size), cropBound, GraphicsUnit.Pixel);
-
-            if (disposeSource) try { bitmap.Dispose(); } catch { }
-            return newBitmap;
+                if (disposeSource) bitmap.Dispose();
+            }
         }
 
         private static readonly HashSet<string> targetExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -177,6 +197,7 @@ namespace atri_composite
         public static void InitializeFileCache(IEnumerable<string> rootDirectories, Action<string, int, int, int, long> onProgress = null)
         {
             fileLookupCache.Clear();
+            pbdCache.Clear();
             WorkingDirectories = rootDirectories.ToList();
 
             var allDirs = new List<string>();
@@ -309,7 +330,8 @@ namespace atri_composite
             return matchCount;
         }
 
-        private static readonly ConcurrentDictionary<string, JArray> pbdCache = new ConcurrentDictionary<string, JArray>();
+        private static readonly ConcurrentDictionary<string, Lazy<JArray>> pbdCache =
+            new ConcurrentDictionary<string, Lazy<JArray>>();
         public static JArray LoadPBDFile(string pbdPath, bool normalize = false)
         {
             var resolved = FindFile(pbdPath);
@@ -321,36 +343,64 @@ namespace atri_composite
             {
                 if (!File.Exists(pbdPath))
                 {
-                    pbdPath = Path.Combine(Directory.GetParent(Path.GetDirectoryName(pbdPath)).FullName, Path.GetFileName(pbdPath));
+                    var directory = Path.GetDirectoryName(pbdPath);
+                    var parent = string.IsNullOrEmpty(directory) ? null : Directory.GetParent(directory);
+                    if (parent != null)
+                        pbdPath = Path.Combine(parent.FullName, Path.GetFileName(pbdPath));
                 }
             }
 
-            return pbdCache.GetOrAdd(pbdPath, o =>
+            pbdPath = Path.GetFullPath(pbdPath);
+            var sourcePath = pbdPath;
+            var cacheKey = sourcePath + "\0" + normalize;
+            return pbdCache.GetOrAdd(cacheKey, _ => new Lazy<JArray>(() =>
             {
-                if (File.Exists(o))
+                if (File.Exists(sourcePath))
                 {
-                    var proc = Process.Start(new ProcessStartInfo()
+                    var converterPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "pbd2json.exe");
+                    if (!File.Exists(converterPath))
+                        throw new FileNotFoundException("Cannot find the PBD converter.", converterPath);
+
+                    using (var proc = new Process())
                     {
-                        FileName = "cmd.exe",
-                        Arguments = $"/C chcp 65001 > nul && pbd2json.exe \"{o}\"",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true,
-                        StandardOutputEncoding = Encoding.UTF8
-                    });
-                    var json = proc.StandardOutput.ReadToEnd();
-                    proc.WaitForExit();
-                    return JArray.Parse(normalize ? json.Normalize(NormalizationForm.FormKC) : json);
+                        proc.StartInfo = new ProcessStartInfo
+                        {
+                            FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe",
+                            Arguments = $"/D /C chcp 65001 > nul && \"{converterPath}\" \"{sourcePath}\"",
+                            WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true,
+                            StandardOutputEncoding = Encoding.UTF8,
+                            StandardErrorEncoding = Encoding.UTF8
+                        };
+                        proc.Start();
+                        var outputTask = proc.StandardOutput.ReadToEndAsync();
+                        var errorTask = proc.StandardError.ReadToEndAsync();
+                        proc.WaitForExit();
+                        Task.WaitAll(outputTask, errorTask);
+
+                        if (proc.ExitCode != 0)
+                            throw new InvalidDataException($"PBD conversion failed with exit code {proc.ExitCode}: {errorTask.Result}");
+                        if (string.IsNullOrWhiteSpace(outputTask.Result))
+                            throw new InvalidDataException("PBD conversion returned no data.");
+
+                        var json = normalize
+                            ? outputTask.Result.Normalize(NormalizationForm.FormKC)
+                            : outputTask.Result;
+                        return JArray.Parse(json);
+                    }
                 }
 
                 // Fallback: try .txt file (older game format)
-                var txtPath = Path.ChangeExtension(o, ".txt");
+                var txtPath = Path.ChangeExtension(sourcePath, ".txt");
                 var resolvedTxt = FindFile(txtPath);
                 if (resolvedTxt != null) txtPath = resolvedTxt;
                 if (!File.Exists(txtPath))
-                    throw new FileNotFoundException("Cannot find PBD or TXT file for: " + o);
+                    throw new FileNotFoundException("Cannot find PBD or TXT file for: " + sourcePath);
                 return LoadTxtFile(txtPath);
-            });
+            }, LazyThreadSafetyMode.ExecutionAndPublication)).Value;
         }
 
 
@@ -364,12 +414,14 @@ namespace atri_composite
             if (lines.Length > 1)
             {
                 var dimCols = lines[1].Split('\t');
-                if (dimCols.Length > 4)
+                if (dimCols.Length > 5)
                 {
                     int.TryParse(dimCols[4], out canvasWidth);
                     int.TryParse(dimCols[5], out canvasHeight);
                 }
             }
+            if (canvasWidth <= 0 || canvasHeight <= 0)
+                throw new InvalidDataException("Invalid or missing canvas dimensions in: " + txtPath);
             jArr.Add(new JObject
             {
                 ["width"] = canvasWidth,

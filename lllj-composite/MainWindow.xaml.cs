@@ -6,9 +6,9 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media.Imaging;
 
@@ -29,7 +29,6 @@ namespace atri_composite
             {
                 OnPropertyChanged(_image = value);
                 OnPropertyChanged(null, "ImageSize");
-                GC.Collect();
             }
         }
         public string ImageSize => Image == null ? "" : $"{Image.PixelWidth}x{Image.PixelHeight}";
@@ -102,29 +101,38 @@ namespace atri_composite
         {
             if (SelectedCharacter != null && SelectedPose != null && SelectedDress != null && SelectedAddition != null && SelectedFace != null && !PauseGenerate)
             {
-                var pbdPath = Utils.FindFile(Path.Combine(SelectedCharacter.Name, $"{SelectedPose.Name}.pbd"))
-                              ?? Utils.FindFile($"{SelectedPose.Name}.pbd");
-
-                if (pbdPath == null)
-                {
-                    // also allow images to be placed in the data root
-                    pbdPath = Path.Combine(WorkingDirectory, SelectedCharacter.Name, $"{SelectedPose.Name}.pbd");
-                    if (!File.Exists(pbdPath))
-                    {
-                        pbdPath = Path.Combine(Directory.GetParent(Path.GetDirectoryName(pbdPath)).FullName, Path.GetFileName(pbdPath));
-                    }
-                }
-
-                var image = new CompoundImage(pbdPath);
+                string pbdPath = null;
                 var layers = new List<string>();
-                layers.Add(SelectedDress.LayerPath);
-                layers.Add(SelectedAddition.LayerPaths[0]);
-                layers.AddRange(SelectedFace.LayerPaths);
-                layers.AddRange(SelectedAddition.LayerPaths.GetRange(1, SelectedAddition.LayerPaths.Count - 1));
-
                 try
                 {
-                    Image = image.Generate(layers.ToArray()).Crop(true).ToBitmapSource(true);
+                    pbdPath = Utils.FindFile(Path.Combine(SelectedCharacter.Name, $"{SelectedPose.Name}.pbd"))
+                              ?? Utils.FindFile($"{SelectedPose.Name}.pbd");
+
+                    if (pbdPath == null)
+                    {
+                        // also allow images to be placed in the data root
+                        pbdPath = Path.Combine(WorkingDirectory, SelectedCharacter.Name, $"{SelectedPose.Name}.pbd");
+                        if (!File.Exists(pbdPath))
+                        {
+                            var directory = Path.GetDirectoryName(pbdPath);
+                            var parent = string.IsNullOrEmpty(directory) ? null : Directory.GetParent(directory);
+                            if (parent != null)
+                                pbdPath = Path.Combine(parent.FullName, Path.GetFileName(pbdPath));
+                        }
+                    }
+
+                    if (SelectedAddition.LayerPaths.Count == 0)
+                        throw new InvalidDataException("The selected addition contains no layers.");
+
+                    var image = new CompoundImage(pbdPath);
+                    layers.Add(SelectedDress.LayerPath);
+                    layers.Add(SelectedAddition.LayerPaths[0]);
+                    layers.AddRange(SelectedFace.LayerPaths);
+                    layers.AddRange(SelectedAddition.LayerPaths.Skip(1));
+
+                    using (var generated = image.Generate(layers.ToArray()))
+                    using (var cropped = generated.Crop())
+                        Image = cropped.ToBitmapSource();
                 }
                 catch (Exception e)
                 {
@@ -165,9 +173,16 @@ namespace atri_composite
             dialog.Filters.Add(new CommonFileDialogFilter("PNG Image", ".png"));
             if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
             {
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(Image));
-                using (var file = File.Create(dialog.FileName)) encoder.Save(file);
+                try
+                {
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(Image));
+                    using (var file = File.Create(dialog.FileName)) encoder.Save(file);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
@@ -180,7 +195,7 @@ namespace atri_composite
             e.Handled = true;
         }
 
-        private void OnBatchExportClick(object sender, RoutedEventArgs e)
+        private async void OnBatchExportClick(object sender, RoutedEventArgs e)
         {
             var dialog = new CommonOpenFileDialog()
             {
@@ -207,8 +222,20 @@ namespace atri_composite
                 var result = MessageBox.Show($"{count} images will be saved to {dialog.FileName}.\nThis may take a long time!\nProceed?", "Notice", MessageBoxButton.YesNo);
                 if (result == MessageBoxResult.Yes)
                 {
-                    var errors = exporter.Run(limits);
-                    MessageBox.Show($"{count - errors} images saved. {errors} failed.", "Notice", MessageBoxButton.OK);
+                    IsEnabled = false;
+                    try
+                    {
+                        var errors = await Task.Run(() => exporter.Run(limits));
+                        MessageBox.Show($"{count - errors} images saved. {errors} failed.", "Notice", MessageBoxButton.OK);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.ToString(), "Batch export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    finally
+                    {
+                        IsEnabled = true;
+                    }
                 }
             }
         }
@@ -245,24 +272,7 @@ namespace atri_composite
 
             if (allFaces == null) return null;
 
-            string currentDressName = selectedDress?.Name;
-            
-            return allFaces.Where(face =>
-            {
-                if (string.IsNullOrEmpty(face.Name)) return false;
-
-                if (face.Name.Contains("@"))
-                {
-                    var parts = face.Name.Split('@');
-                    if (parts.Length > 1)
-                    {
-                        return parts[1] == currentDressName;
-                    }
-                    return false;
-                }
-                
-                return true; 
-            }).ToList();
+            return CharacterProcessor.GetFacesForDress(allFaces, selectedDress).ToList();
         }
 
         public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)

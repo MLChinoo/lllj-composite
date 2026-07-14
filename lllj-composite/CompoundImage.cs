@@ -89,55 +89,63 @@ namespace atri_composite
 
         public Bitmap Generate(params string[] layers)
         {
-            var bitmap = new Bitmap(Width, Height);
-            foreach (var s in layers)
+            var bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppArgb);
+            try
             {
-                if (s == "dummy") continue;
-                var layer = GetLayer(s);
-                if (layer == null) throw new ArgumentException();
+                foreach (var s in layers)
+                {
+                    if (s == "dummy") continue;
+                    var layer = GetLayer(s);
+                    if (layer == null) throw new ArgumentException("Cannot find layer: " + s, nameof(layers));
                 
-                // 天音a 水着帽子 这个图层混合错误，暂时没定位到原因
-                if (layer.LayerID == 8320 && layer.Name.Equals("帽子埋め")) continue;
+                    // 天音a 水着帽子 这个图层混合错误，暂时没定位到原因
+                    if (layer.LayerID == 8320 && layer.Name.Equals("帽子埋め")) continue;
 
-                Bitmap layerBitmap;
-                FreeMote.Tlg.TlgLoader tlgLoader = null;
-                if (layer.Path.EndsWith(".png"))
-                {
-                    layerBitmap = new Bitmap(layer.Path);
-                }
-                else
-                {
-                    tlgLoader = new FreeMote.Tlg.TlgLoader(File.ReadAllBytes(layer.Path));
-                    layerBitmap = tlgLoader.Bitmap;
-                }
-
-                try
-                {
-                    switch (layer.Type)
+                    Bitmap layerBitmap = null;
+                    FreeMote.Tlg.TlgLoader tlgLoader = null;
+                    try
                     {
-                        case KrBlendMode.ltPsNormal:
-                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsNormalCore, updateAlpha: true);
-                            break;
-                        case KrBlendMode.ltPsDarken:
-                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsDarkenCore, updateAlpha: false);
-                            break;
-                        case KrBlendMode.ltPsMultiplicative:
-                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsMultiplyCore, updateAlpha: false);
-                            break;
-                        case KrBlendMode.ltPsColorDodge:
-                            BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsColorDodgeCore, updateAlpha: false);
-                            break;
-                        default:
-                            throw new NotSupportedException($"Blend mode {layer.Type} is not supported.");
+                        if (layer.Path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                        {
+                            layerBitmap = new Bitmap(layer.Path);
+                        }
+                        else
+                        {
+                            tlgLoader = new FreeMote.Tlg.TlgLoader(File.ReadAllBytes(layer.Path));
+                            layerBitmap = tlgLoader.Bitmap;
+                        }
+
+                        switch (layer.Type)
+                        {
+                            case KrBlendMode.ltPsNormal:
+                                BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsNormalCore, updateAlpha: true);
+                                break;
+                            case KrBlendMode.ltPsDarken:
+                                BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsDarkenCore, updateAlpha: false);
+                                break;
+                            case KrBlendMode.ltPsMultiplicative:
+                                BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsMultiplyCore, updateAlpha: false);
+                                break;
+                            case KrBlendMode.ltPsColorDodge:
+                                BlendKrkrzPs(bitmap, layerBitmap, layer.Left, layer.Top, layer.Opacity, PsColorDodgeCore, updateAlpha: false);
+                                break;
+                            default:
+                                throw new NotSupportedException($"Blend mode {layer.Type} is not supported.");
+                        }
+                    }
+                    finally
+                    {
+                        layerBitmap?.Dispose();
+                        tlgLoader?.Dispose();
                     }
                 }
-                finally
-                {
-                    layerBitmap.Dispose();
-                    tlgLoader?.Dispose();
-                }
+                return bitmap;
             }
-            return bitmap;
+            catch
+            {
+                bitmap.Dispose();
+                throw;
+            }
         }
 
         private static void BlendKrkrzPs(
@@ -153,10 +161,11 @@ namespace atri_composite
             var rectTop = new Rectangle(0, 0, topBmp.Width, topBmp.Height);
 
             var baseData = baseBmp.LockBits(rectBase, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
-            var topData = topBmp.LockBits(rectTop, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            BitmapData topData = null;
 
             try
             {
+                topData = topBmp.LockBits(rectTop, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
                 int baseStride = baseData.Stride;
                 int topStride = topData.Stride;
 
@@ -223,8 +232,14 @@ namespace atri_composite
             }
             finally
             {
-                baseBmp.UnlockBits(baseData);
-                topBmp.UnlockBits(topData);
+                try
+                {
+                    if (topData != null) topBmp.UnlockBits(topData);
+                }
+                finally
+                {
+                    baseBmp.UnlockBits(baseData);
+                }
             }
         }
 
