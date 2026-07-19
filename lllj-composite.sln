@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "lllj-composite", "lllj-comp
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TlgLib", "FreeMote.Tlg\TlgLib\TlgLib.vcxproj", "{DF6C7BC2-3D99-4AE8-86E5-087BA766A3A8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FreeMote.Tlg.Managed", "FreeMote.Tlg\FreeMote.Tlg.Managed\FreeMote.Tlg.Managed.csproj", "{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{DF6C7BC2-3D99-4AE8-86E5-087BA766A3A8}.Release|x64.Build.0 = Release|x64
 		{DF6C7BC2-3D99-4AE8-86E5-087BA766A3A8}.Release|x86.ActiveCfg = Release|Win32
 		{DF6C7BC2-3D99-4AE8-86E5-087BA766A3A8}.Release|x86.Build.0 = Release|Win32
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Debug|x64.Build.0 = Debug|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Debug|x86.Build.0 = Debug|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Release|x64.ActiveCfg = Release|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Release|x64.Build.0 = Release|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Release|x86.ActiveCfg = Release|Any CPU
+		{4E30A0A2-70DB-4A0E-98B3-42D065F7CFEC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

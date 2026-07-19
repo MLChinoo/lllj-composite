@@ -91,6 +91,7 @@
     <Compile Include="BatchExporter.cs" />
     <Compile Include="Character.cs" />
     <Compile Include="CompoundImage.cs" />
+    <Compile Include="TlgImageDecoder.cs" />
     <Compile Include="Utils.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -165,6 +166,9 @@
     <Resource Include="icon.ico" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\FreeMote.Tlg\FreeMote.Tlg.Managed\FreeMote.Tlg.Managed.csproj">
+      <Name>FreeMote.Tlg.Managed</Name>
+    </ProjectReference>
     <ProjectReference Include="..\FreeMote.Tlg\TlgLib\TlgLib.vcxproj">
       <Project>{df6c7bc2-3d99-4ae8-86e5-087ba766a3a8}</Project>
       <Name>TlgLib</Name>

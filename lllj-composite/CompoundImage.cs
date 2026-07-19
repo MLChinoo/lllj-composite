@@ -102,7 +102,7 @@ namespace atri_composite
                     if (layer.LayerID == 8320 && layer.Name.Equals("帽子埋め")) continue;
 
                     Bitmap layerBitmap = null;
-                    FreeMote.Tlg.TlgLoader tlgLoader = null;
+                    DecodedTlgImage decodedTlg = null;
                     try
                     {
                         if (layer.Path.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
@@ -111,8 +111,8 @@ namespace atri_composite
                         }
                         else
                         {
-                            tlgLoader = new FreeMote.Tlg.TlgLoader(File.ReadAllBytes(layer.Path));
-                            layerBitmap = tlgLoader.Bitmap;
+                            decodedTlg = TlgImageDecoder.Decode(layer.Path);
+                            layerBitmap = decodedTlg.Bitmap;
                         }
 
                         switch (layer.Type)
@@ -135,8 +135,10 @@ namespace atri_composite
                     }
                     finally
                     {
-                        layerBitmap?.Dispose();
-                        tlgLoader?.Dispose();
+                        if (decodedTlg != null)
+                            decodedTlg.Dispose();
+                        else
+                            layerBitmap?.Dispose();
                     }
                 }
                 return bitmap;
