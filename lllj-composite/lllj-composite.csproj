@@ -8,7 +8,7 @@
     <OutputType>WinExe</OutputType>
     <RootNamespace>atri_composite</RootNamespace>
     <AssemblyName>lllj-composite</AssemblyName>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{60dc8134-eba5-43b8-bcc9-bb4bc16c2548};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <WarningLevel>4</WarningLevel>
@@ -151,7 +151,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <BootstrapperPackage Include=".NETFramework,Version=v4.7.2">
+    <BootstrapperPackage Include=".NETFramework,Version=v4.8">
       <Visible>False</Visible>
       <ProductName>Microsoft .NET Framework 4.7.2 %28x86 和 x64%29</ProductName>
       <Install>true</Install>
@@ -166,8 +166,15 @@
     <Resource Include="icon.ico" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="System.Drawing.Common" Version="10.0.4">
+      <Aliases>SystemDrawingCommon</Aliases>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\FreeMote.Tlg\FreeMote.Tlg.Managed\FreeMote.Tlg.Managed.csproj">
       <Name>FreeMote.Tlg.Managed</Name>
+      <SetConfiguration>Configuration=$(Configuration)</SetConfiguration>
+      <SetTargetFramework>Configuration=$(Configuration);TargetFramework=netstandard2.0;LangVersion=latest;MSBuildEnableWorkloadResolver=false</SetTargetFramework>
     </ProjectReference>
     <ProjectReference Include="..\FreeMote.Tlg\TlgLib\TlgLib.vcxproj">
       <Project>{df6c7bc2-3d99-4ae8-86e5-087ba766a3a8}</Project>

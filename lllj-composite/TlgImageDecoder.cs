@@ -1,7 +1,9 @@
 using FreeMote.Tlg.Managed;
 using System;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace atri_composite
@@ -19,7 +21,7 @@ namespace atri_composite
                 try
                 {
                     var decoded = TlgQoiCodec.Decode(path);
-                    return new DecodedTlgImage(decoded.CreateBitmap(), null);
+                    return new DecodedTlgImage(CreateBitmap(decoded), null);
                 }
                 catch (Exception ex) when (!(ex is OutOfMemoryException))
                 {
@@ -52,6 +54,30 @@ namespace atri_composite
                 }
 
                 return true;
+            }
+        }
+
+        private static Bitmap CreateBitmap(TlgDecodedImage image)
+        {
+            var bitmap = new Bitmap(image.Width, image.Height, PixelFormat.Format32bppArgb);
+            var rect = new Rectangle(0, 0, image.Width, image.Height);
+            BitmapData bitmapData = null;
+            try
+            {
+                bitmapData = bitmap.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                var rowBytes = checked(image.Width * 4);
+                for (var y = 0; y < image.Height; y++)
+                    Marshal.Copy(image.Bgra32, y * rowBytes, IntPtr.Add(bitmapData.Scan0, y * bitmapData.Stride), rowBytes);
+
+                bitmap.UnlockBits(bitmapData);
+                bitmapData = null;
+                return bitmap;
+            }
+            catch
+            {
+                if (bitmapData != null) bitmap.UnlockBits(bitmapData);
+                bitmap.Dispose();
+                throw;
             }
         }
     }
