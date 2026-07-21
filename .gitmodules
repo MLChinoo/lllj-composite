@@ -2,3 +2,6 @@
 	path = FreeMote.Tlg
 	url = https://github.com/UlyssesWu/FreeMote.Tlg
 	branch = master
+[submodule "TjsParser"]
+	path = TjsParser
+	url = https://github.com/MLChinoo/TjsParser.git

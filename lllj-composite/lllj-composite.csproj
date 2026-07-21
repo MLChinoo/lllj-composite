@@ -180,6 +180,11 @@
       <Project>{df6c7bc2-3d99-4ae8-86e5-087ba766a3a8}</Project>
       <Name>TlgLib</Name>
     </ProjectReference>
+    <ProjectReference Include="..\TjsParser\src\TjsParser\TjsParser.csproj">
+      <Name>TjsParser</Name>
+      <SetConfiguration>Configuration=$(Configuration)</SetConfiguration>
+      <SetTargetFramework>Configuration=$(Configuration);TargetFramework=netstandard2.0;LangVersion=latest;MSBuildEnableWorkloadResolver=false</SetTargetFramework>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

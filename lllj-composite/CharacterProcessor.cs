@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
+using TjsParser;
+using TjsParser.Parsing;
+using TjsParser.Syntax;
 
 namespace atri_composite
 {
@@ -16,22 +17,29 @@ namespace atri_composite
             foreach (var file in standFiles)
             {
                 var character = new Character() { Name = Path.GetFileNameWithoutExtension(file) };
-                MatchCollection rtxt;
+                List<string> filenames;
                 try
                 {
-                    rtxt = Regex.Matches(File.ReadAllText(file, Utils.StandEncoding), "filename:'([^']+)'");
+                    var source = File.ReadAllText(file, Utils.StandEncoding);
+                    var result = Parser.ParseText(source, file, new ParseOptions { RootMode = RootMode.Expression });
+                    if (!result.Success)
+                    {
+                        var diagnostics = string.Join("; ", result.Diagnostics
+                            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+                            .Select(diagnostic => $"{diagnostic.Code} at {diagnostic.Span.Start.Line}:{diagnostic.Span.Start.Column}: {diagnostic.Message}"));
+                        throw new InvalidDataException(diagnostics);
+                    }
+
+                    filenames = ExtractFilenames(result.Document).ToList();
                 }
                 catch (System.Exception ex)
                 {
-                    Trace.TraceError($"Failed to read stand file {file}: {ex.Message}");
+                    Trace.TraceError($"Failed to parse stand file {file}: {ex.Message}");
                     continue;
                 }
 
-                foreach (Match match in rtxt)
+                foreach (var name in filenames)
                 {
-                    var m = match.Groups[1].Value;
-                    var name = m;
-
                     try
                     {
                         var pose = new Character.Pose();
@@ -70,6 +78,28 @@ namespace atri_composite
                 if (character.Poses.Count > 0) characters.Add(character);
             }
             return characters;
+        }
+
+        private static IEnumerable<string> ExtractFilenames(SyntaxNode node)
+        {
+            var entry = node as DictionaryEntrySyntax;
+            if (entry != null)
+            {
+                var key = entry.Key as LiteralExpressionSyntax;
+                var value = entry.Value as LiteralExpressionSyntax;
+                if (key != null && key.LiteralKind == LiteralKind.String &&
+                    string.Equals(key.Value as string, "filename", System.StringComparison.Ordinal) &&
+                    value != null && value.LiteralKind == LiteralKind.String && value.Value is string)
+                {
+                    yield return (string)value.Value;
+                }
+            }
+
+            foreach (var child in node.ChildNodes())
+            {
+                foreach (var filename in ExtractFilenames(child))
+                    yield return filename;
+            }
         }
 
         private static Character.Pose ProcessStandInfo(string sInfoPath)
